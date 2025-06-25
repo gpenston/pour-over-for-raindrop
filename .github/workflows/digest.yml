@@ -1,0 +1,31 @@
+name: Send Weekly Raindrop Digest
+
+on:
+  schedule:
+    - cron: '0 15 * * 1'  # Every Monday at 8am PT (15:00 UTC)
+  workflow_dispatch:      # Allow manual runs
+
+jobs:
+  send-digest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run digest script
+        env:
+          RAINDROP_TOKEN: ${{ secrets.RAINDROP_TOKEN }}
+          COLLECTION_ID: ${{ secrets.COLLECTION_ID }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          TO_EMAIL: ${{ secrets.TO_EMAIL }}
+          FROM_EMAIL: ${{ secrets.FROM_EMAIL }}
+        run: node raindrop-digest.js
