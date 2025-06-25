@@ -1,17 +1,17 @@
 // raindrop-digest.js
+import axios from 'axios';
+import nodemailer from 'nodemailer';
+import dayjs from 'dayjs';
 
-const axios = require('axios');
-const nodemailer = require('nodemailer');
-const dayjs = require('dayjs');
-
-// --- CONFIG (replace with env vars or secrets) ---
-const RAINDROP_TOKEN = process.env.RAINDROP_TOKEN;
-const COLLECTION_ID = process.env.COLLECTION_ID;
-const SMTP_USER = process.env.SMTP_USER;
-const SMTP_PASS = process.env.SMTP_PASS;
-const TO_EMAIL = process.env.TO_EMAIL;
-const FROM_EMAIL = process.env.FROM_EMAIL;
-// -----------------------------------------------
+// --- CONFIG FROM ENV VARS ---
+const {
+  RAINDROP_TOKEN,
+  COLLECTION_ID,
+  SMTP_USER,
+  SMTP_PASS,
+  TO_EMAIL,
+  FROM_EMAIL
+} = process.env;
 
 const fetchBookmarks = async () => {
   const since = dayjs().subtract(7, 'day').toISOString();
@@ -41,9 +41,9 @@ const buildHTML = (items) => {
       ${items
         .map(
           (item) => `
-        <li>
-          <a href="${item.link}">${item.title || item.link}</a><br>
-          ${item.excerpt || ''}
+        <li style="margin-bottom: 1em;">
+          <a href="${item.link}" style="font-size: 16px;">${item.title || item.link}</a><br>
+          <span style="color: #666;">${item.excerpt || ''}</span>
         </li>`
         )
         .join('')}
@@ -71,11 +71,16 @@ const sendEmail = async (html, subject) => {
 };
 
 const main = async () => {
-  const items = await fetchBookmarks();
-  const html = buildHTML(items);
-  const subject = `Your Read Later Digest: ${dayjs().subtract(7, 'day').format('MMM D')} – ${dayjs().format('MMM D')}`;
-
-  await sendEmail(html, subject);
+  try {
+    const items = await fetchBookmarks();
+    const html = buildHTML(items);
+    const subject = `Your Read Later Digest: ${dayjs().subtract(7, 'day').format('MMM D')} – ${dayjs().format('MMM D')}`;
+    await sendEmail(html, subject);
+    console.log('Digest sent successfully.');
+  } catch (err) {
+    console.error('Error sending digest:', err);
+    process.exit(1);
+  }
 };
 
-main().catch(console.error);
+main();
