@@ -1,4 +1,4 @@
-// raindrop-digest.js with hardcoded dark-mode-friendly styling
+// raindrop-digest.js with full-width background-safe email layout
 import axios from 'axios';
 import nodemailer from 'nodemailer';
 import dayjs from 'dayjs';
@@ -132,10 +132,18 @@ const buildHTML = async (items) => {
   }));
 
   return `
-    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #1c1c1e; color: #f5f5f7; padding: 1em; line-height: 1.6;">
-      <h2 style="color: #f5f5f7;">Your Read Later Digest</h2>
-      ${htmlBlocks.join('')}
-    </div>`;
+    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #1c1c1e; padding: 0; margin: 0;">
+      <tr>
+        <td align="center">
+          <table width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;padding: 1em; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #f5f5f7;">
+            <tr><td>
+              <h2 style="color: #f5f5f7;">Your Read Later Digest</h2>
+              ${htmlBlocks.join('')}
+            </td></tr>
+          </table>
+        </td>
+      </tr>
+    </table>`;
 };
 
 const sendEmail = async (html, subject) => {
