@@ -1,4 +1,4 @@
-// raindrop-digest.js with GPT summaries and light/dark mode support
+// raindrop-digest.js with GPT summaries saved to Raindrop notes
 import axios from 'axios';
 import nodemailer from 'nodemailer';
 import dayjs from 'dayjs';
@@ -52,8 +52,13 @@ const estimateReadTime = (text) => {
   return minutes <= 1 ? '1 min read' : `${minutes} min read`;
 };
 
-const summarize = async (title, excerpt) => {
+const summarize = async (item) => {
+  const title = item.title;
+  const excerpt = item.excerpt;
+  const id = item._id;
+
   if (!OPENAI_API_KEY || !excerpt) return null;
+
   try {
     const response = await axios.post(
       'https://api.openai.com/v1/chat/completions',
@@ -79,9 +84,24 @@ const summarize = async (title, excerpt) => {
         }
       }
     );
-    return response.data.choices[0].message.content.trim();
+
+    const summary = response.data.choices[0].message.content.trim();
+    const noteUpdate = `—— AI Summary ——\n${summary}`;
+
+    await axios.put(
+      `https://api.raindrop.io/rest/v1/raindrop/${id}`,
+      { note: noteUpdate },
+      {
+        headers: {
+          Authorization: `Bearer ${RAINDROP_TOKEN}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+
+    return summary;
   } catch (err) {
-    console.error('GPT summary error:', err.message);
+    console.error(`Error summarizing or updating Raindrop for ID ${id}:`, err.message);
     return null;
   }
 };
@@ -98,7 +118,7 @@ const buildHTML = async (items) => {
     const readTime = excerpt ? estimateReadTime(excerpt) : '';
     const tags = item.tags?.length ? item.tags.map(tag => `<span style="background:#ddd;border-radius:4px;padding:2px 6px;margin-right:5px;font-size:12px;color:#444;">${tag}</span>`).join('') : '';
     const image = item.cover || (item.media && item.media[0]?.link);
-    const summary = await summarize(title, excerpt);
+    const summary = await summarize(item);
 
     return `
       <div style="margin-bottom: 2em;">
