@@ -1,6 +1,6 @@
 import axios from 'axios';
 import nodemailer from 'nodemailer';
-import { format } from 'date-fns';
+import dayjs from 'dayjs';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -43,7 +43,7 @@ async function getRaindropItems() {
 }
 
 function buildEmailHTML(items) {
-  const today = format(new Date(), 'MMM dd, yyyy');
+  const today = dayjs().format('MMM DD, YYYY');
 
   const emailBody = `
   <html>
@@ -126,7 +126,7 @@ function buildEmailHTML(items) {
             ${item.excerpt ? `<div class="excerpt">${item.excerpt}</div>` : ''}
             <div class="meta">
               <a href="${item.link}" class="original-link">(Original)</a><br/>
-              ${new URL(item.link).hostname} • Saved on ${format(new Date(item.created), 'MMM dd')} • ${item.readTime || '1'} min read
+              ${new URL(item.link).hostname} • Saved on ${dayjs(item.created).format('MMM DD')} • ${item.readTime || '1'} min read
             </div>
           </div>
         `
@@ -154,18 +154,22 @@ async function sendEmail(digestHTML) {
   await transporter.sendMail({
     from: `George Penston <${process.env.EMAIL_USER}>`,
     to: process.env.EMAIL_TO,
-    subject: `Your Read Later Digest: ${format(new Date(), 'MMM dd')}`,
+    subject: `Your Read Later Digest: ${dayjs().format('MMM DD')}`,
     html: digestHTML,
   });
 }
 
 (async () => {
   try {
+    console.log("Fetching items...");
     const items = await getRaindropItems();
+    console.log(`Fetched ${items.length} items`);
     const digestHTML = buildEmailHTML(items);
+    console.log("Sending email...");
     await sendEmail(digestHTML);
-    console.log('Digest sent!');
+    console.log("Digest sent successfully!");
   } catch (error) {
-    console.error('Error sending digest:', error);
+    console.error("Error sending digest:", error);
+    process.exit(1);
   }
 })();
