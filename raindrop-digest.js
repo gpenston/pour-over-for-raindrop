@@ -39,8 +39,8 @@ function buildEmailHtml(items) {
     h1 { font-family: 'New York', Georgia, serif; font-size: 2rem; margin-bottom: 1.5rem; }
     .item { margin-bottom: 3rem; }
     img.preview { width: 100%; border-radius: 12px; margin-bottom: 1rem; }
-    .title { font-size: 1.25rem; font-weight: 600; margin: 0 0 0.5rem; }
-    .description { font-size: 0.95rem; line-height: 1.5; margin-bottom: 0.75rem; }
+    .title { font-size: 1.25rem; font-weight: 600; margin: 0 0 0.5rem; color: ${linkColor}; }
+    .description { font-size: 0.95rem; line-height: 1.5; margin-bottom: 0.75rem; color: inherit; }
     .meta { font-size: 0.85rem; color: #555; display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem; }
     img.icon { width: 16px; height: 16px; vertical-align: text-bottom; }
     hr { border: none; border-top: 1px solid #ccc; margin: 2rem 0; }
@@ -55,7 +55,7 @@ function buildEmailHtml(items) {
     return `
       <div class="item">
         ${item.cover ? `<img class="preview" src="${item.cover}" alt="cover" />` : ''}
-        <a class="title" href="${previewUrl}" style="color: ${linkColor}; text-decoration: none;">${item.title}</a>
+        <a class="title" href="${previewUrl}" style="text-decoration: none;">${item.title}</a>
         ${item.excerpt ? `<div class="description">${item.excerpt}</div>` : ''}
         <div class="meta">
           <img class="icon" src="${favicon}" alt="favicon" />
@@ -106,17 +106,16 @@ async function sendDigestEmail(html) {
   console.log('📧 Message sent:', info.messageId);
 }
 
-// Main execution
+// Main execution: fetch and send only the latest N items regardless of time
 (async () => {
   try {
     const items = await getRaindropItems();
     console.log(`Total fetched: ${items.length}`);
-    const recent = items.slice(0, 5);
-    const older = items.slice(5);
-    const random = older.sort(() => Math.random() - 0.5).slice(0, 2);
-    console.log(`Recent items: ${recent.length}, Random items: ${random.length}`);
+    const latestCount = 7;
+    const latestItems = items.slice(0, latestCount);
+    console.log(`Latest items: ${latestItems.length}`);
 
-    const html = buildEmailHtml([...recent, ...random]);
+    const html = buildEmailHtml(latestItems);
     console.log(`✉️ Sending digest to: ${TO_EMAIL}`);
     await sendDigestEmail(html);
     console.log('✅ Digest sent!');
