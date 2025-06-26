@@ -6,129 +6,148 @@ import axios from 'axios';
 import nodemailer from 'nodemailer';
 import dayjs from 'dayjs';
 
-const RAINDROP_TOKEN = process.env.RAINDROP_TOKEN;
+const RAINDROP_API_URL = 'https://api.raindrop.io/rest/v1';
+const TOKEN = process.env.RAINDROP_TOKEN;
 const COLLECTION_ID = process.env.COLLECTION_ID;
-const ARCHIVE_COLLECTION_ID = process.env.ARCHIVE_COLLECTION_ID;
-const TO_EMAIL = process.env.TO_EMAIL;
-const FROM_EMAIL = process.env.FROM_EMAIL;
-const SMTP_HOST = process.env.SMTP_HOST;
-const SMTP_PORT = process.env.SMTP_PORT;
-const SMTP_USER = process.env.SMTP_USER;
-const SMTP_PASS = process.env.SMTP_PASS;
+const ARCHIVE_ID = process.env.ARCHIVE_ID;
 
-const getRaindropItems = async () => {
-  const url = `https://api.raindrop.io/rest/v1/raindrops/${COLLECTION_ID}?perpage=100&sort=-created`;
-  const headers = { Authorization: `Bearer ${RAINDROP_TOKEN}` };
-  const response = await axios.get(url, { headers });
-  return response.data.items || [];
+const headers = {
+  Authorization: `Bearer ${TOKEN}`
 };
 
-const buildEmailHTML = (items) => {
-  const styles = `
-    <style>
-      @media (prefers-color-scheme: dark) {
-        body { background: #000; color: #fff; }
-        a { color: #4ea8ff; }
-      }
-      body {
-        font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif;
-        margin: 2em;
-        line-height: 1.5;
-        color: #111;
-      }
-      .item {
-        margin-bottom: 2em;
-        padding-bottom: 1em;
-        border-bottom: 1px solid #ccc;
-      }
-      .item h2 {
-        margin: 0;
-        font-size: 1.2em;
-      }
-      .item p {
-        margin: 0.5em 0 0 0;
-      }
-      .source-link {
-        font-size: 0.9em;
-        color: #666;
-      }
-    </style>
+async function getRaindropItems(collectionId) {
+  const res = await axios.get(`${RAINDROP_API_URL}/raindrops/${collectionId}`, { headers });
+  return res.data.items;
+}
+
+function pickRandom(arr, count) {
+  const shuffled = [...arr].sort(() => 0.5 - Math.random());
+  return shuffled.slice(0, count);
+}
+
+function formatDate(timestamp) {
+  return dayjs(timestamp).format('MMM D');
+}
+
+function buildPreviewUrl(collection, item) {
+  return `https://app.raindrop.io/my/${collection}/item/${item._id}/preview`;
+}
+
+function generateEmailHTML(items) {
+  return `
+  <html>
+    <head>
+      <style>
+        body {
+          font-family: -apple-system, BlinkMacSystemFont, 'San Francisco', 'Helvetica Neue', sans-serif;
+          background-color: #fff;
+          color: #000;
+          padding: 2em;
+        }
+        @media (prefers-color-scheme: dark) {
+          body {
+            background-color: #000;
+            color: #fff;
+          }
+        }
+        .item {
+          margin-bottom: 2em;
+        }
+        .item h2 {
+          margin-bottom: 0.2em;
+        }
+        .description {
+          font-family: 'New York', Georgia, serif;
+          font-size: 1em;
+          margin: 0.2em 0 0.6em;
+        }
+        .meta {
+          font-size: 0.9em;
+          color: #666;
+        }
+        @media (prefers-color-scheme: dark) {
+          .meta {
+            color: #aaa;
+          }
+        }
+        a {
+          color: inherit;
+          text-decoration: underline;
+        }
+      </style>
+    </head>
+    <body>
+      <h1>Today’s Raindrop Digest</h1>
+      ${items.map(item => {
+        const previewUrl = buildPreviewUrl(item.collection.$id, item);
+        return `
+        <div class="item">
+          <h2><a href="${previewUrl}">${item.title}</a></h2>
+          ${item.excerpt ? `<div class="description">${item.excerpt}</div>` : ''}
+          <div class="meta">
+            ${item.domain || ''} – Saved ${formatDate(item.created)}
+            <br/><a href="${item.link}" style="font-size:0.85em">(Original link)</a>
+          </div>
+        </div>`;
+      }).join('')}
+    </body>
+  </html>
   `;
+}
 
-  const entries = items.map(item => {
-    const safeTitle = item.title || item.link;
-    const safeDescription = item.excerpt ? item.excerpt.trim() : '';
-    const previewUrl = `https://app.raindrop.io/my/${item.collection?.$id || COLLECTION_ID}/item/${item._id}/preview`;
-    const originalLink = item.link;
-    const domain = new URL(originalLink).hostname.replace('www.', '');
+async function moveToArchive(itemIds) {
+  await axios.request({
+    method: 'PUT',
+    url: `${RAINDROP_API_URL}/raindrops/${ARCHIVE_ID}`,
+    headers,
+    data: {
+      items: itemIds.map(id => ({ _id: id }))
+    }
+  });
+}
 
-    return `
-      <div class="item">
-        <h2><a href="${previewUrl}">${safeTitle}</a></h2>
-        ${safeDescription ? `<p>${safeDescription}</p>` : ''}
-        <p class="source-link"><a href="${originalLink}" target="_blank">Original ↗</a> &middot; ${domain}</p>
-      </div>
-    `;
-  }).join('\n');
-
-  return `<!DOCTYPE html>
-    <html>
-      <head>${styles}</head>
-      <body>
-        <h1>Raindrop Daily Digest</h1>
-        ${entries}
-      </body>
-    </html>`;
-};
-
-const sendEmail = async (html) => {
+async function sendEmail(html) {
   const transporter = nodemailer.createTransport({
-    host: SMTP_HOST,
-    port: SMTP_PORT,
-    secure: true,
+    host: 'smtp.mail.me.com',
+    port: 587,
+    secure: false,
     auth: {
-      user: SMTP_USER,
-      pass: SMTP_PASS
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS
     }
   });
 
-  const info = await transporter.sendMail({
-    from: FROM_EMAIL,
-    to: TO_EMAIL,
-    subject: 'Your Raindrop Daily Digest',
+  await transporter.sendMail({
+    from: process.env.EMAIL_FROM,
+    to: process.env.EMAIL_TO,
+    subject: 'Your Raindrop Digest',
     html
   });
+}
 
-  console.log('Email sent:', info.messageId);
-};
-
-const main = async () => {
+(async () => {
   try {
     console.log('Fetching items...');
-    const allItems = await getRaindropItems();
-    console.log('Total fetched:', allItems.length);
+    const items = await getRaindropItems(COLLECTION_ID);
 
-    const now = dayjs();
-    const recentItems = allItems.filter(item => dayjs(item.created) > now.subtract(36, 'hour')).slice(0, 5);
-    const olderItems = allItems.filter(item => dayjs(item.created) <= now.subtract(7, 'day'));
-    const randomItems = olderItems.sort(() => 0.5 - Math.random()).slice(0, 2);
+    const sorted = items.sort((a, b) => new Date(b.created) - new Date(a.created));
+    const recent = sorted.slice(0, 5);
+    const older = pickRandom(sorted.slice(5), 2);
 
-    console.log('Recent items:', recentItems.length);
-    console.log('Random items:', randomItems.length);
+    console.log(`Total fetched: ${items.length}`);
+    console.log(`Recent items: ${recent.length}`);
+    console.log(`Random items: ${older.length}`);
 
-    const digestItems = [...recentItems, ...randomItems];
-    if (digestItems.length === 0) {
-      console.log('No items to include. Skipping email.');
-      return;
-    }
+    const all = [...recent, ...older];
+    const html = generateEmailHTML(all);
 
-    const html = buildEmailHTML(digestItems);
-    console.log('Sending email to:', TO_EMAIL);
+    console.log(`Sending email to: ${process.env.EMAIL_TO}`);
     await sendEmail(html);
-  } catch (error) {
-    console.error('Error sending digest:', error);
+
+    const allIds = all.map(i => i._id);
+    await moveToArchive(allIds);
+  } catch (err) {
+    console.error('Error sending digest:', err);
     process.exit(1);
   }
-};
-
-main();
+})();
