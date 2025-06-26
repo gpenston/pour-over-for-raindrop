@@ -2,138 +2,148 @@
 import axios from 'axios';
 import nodemailer from 'nodemailer';
 import dotenv from 'dotenv';
-import { formatDistanceToNow } from 'date-fns';
+import dayjs from 'dayjs';
 
 dotenv.config();
 
 const COLLECTION_ID = process.env.COLLECTION_ID;
-const ARCHIVE_ID = process.env.ARCHIVE_ID;
+const ARCHIVE_COLLECTION_ID = process.env.ARCHIVE_COLLECTION_ID;
 const RAINDROP_TOKEN = process.env.RAINDROP_TOKEN;
+const EMAIL_TO = process.env.EMAIL_TO;
+const EMAIL_FROM = process.env.EMAIL_FROM;
 const SMTP_USER = process.env.SMTP_USER;
 const SMTP_PASS = process.env.SMTP_PASS;
 const SMTP_HOST = process.env.SMTP_HOST;
-const SMTP_PORT = parseInt(process.env.SMTP_PORT);
-const EMAIL_TO = process.env.EMAIL_TO;
-const EMAIL_FROM = process.env.EMAIL_FROM;
+const SMTP_PORT = process.env.SMTP_PORT;
 
-if (!COLLECTION_ID) {
-  console.error('❌ COLLECTION_ID is missing. Set it in your env or GitHub Secrets.');
-  process.exit(1);
-}
-
-async function getRaindropItems() {
-  const url = `https://api.raindrop.io/rest/v1/raindrops/${COLLECTION_ID}`;
-  const res = await axios.get(url, {
+async function getRaindropItems(collectionId) {
+  const res = await axios.get(`https://api.raindrop.io/rest/v1/raindrops/${collectionId}`, {
     headers: {
-      Authorization: `Bearer ${RAINDROP_TOKEN}`,
-    },
+      Authorization: `Bearer ${RAINDROP_TOKEN}`
+    }
   });
   return res.data.items;
 }
 
 function buildPreviewLink(item) {
-  return `https://app.raindrop.io/my/${COLLECTION_ID}/item/${item._id}/preview`;
+  return `https://app.raindrop.io/my/${item.collection.$id}/item/${item._id}/preview`;
 }
 
-function buildOriginalLink(item) {
-  return item.link;
+function formatDate(date) {
+  return dayjs(date).format('MMM D, YYYY');
 }
 
-function buildHTMLDigest(recent, older) {
-  const renderItem = (item) => {
-    const timeAgo = formatDistanceToNow(new Date(item.created), { addSuffix: true });
-    const previewLink = buildPreviewLink(item);
-    const originalLink = buildOriginalLink(item);
+function formatHTML(items) {
+  const fontStack = "-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif";
+
+  const itemsHTML = items.map(item => {
+    const previewUrl = buildPreviewLink(item);
+    const originalLink = item.link;
+    const title = item.title || originalLink;
     const description = item.excerpt || '';
-    const domain = new URL(item.link).hostname.replace('www.', '');
-    const sourceIcon = `https://www.google.com/s2/favicons?domain=${domain}`;
+    const domain = new URL(originalLink).hostname.replace('www.', '');
+    const created = formatDate(item.created);
 
     return `
-      <div style="padding: 24px 0; border-bottom: 1px solid var(--border-color);">
-        <a href="${previewLink}" style="font-family: 'New York', Georgia, serif; font-size: 20px; font-weight: 600; color: var(--text-color); text-decoration: none;">${item.title}</a>
-        <div style="font-family: -apple-system, BlinkMacSystemFont, sans-serif; font-size: 14px; color: var(--muted-color); margin-top: 2px;">
-          <img src="${sourceIcon}" alt="" style="vertical-align: middle; height: 14px; margin-right: 4px;">${domain} • Saved ${timeAgo}
+      <div style="margin-bottom: 24px;">
+        <h2 style="margin: 0 0 4px; font-size: 20px; line-height: 1.3;">
+          <a href="${previewUrl}" style="color: inherit; text-decoration: none;">${title}</a>
+        </h2>
+        <p style="margin: 4px 0 8px; font-size: 16px; line-height: 1.5; color: inherit;">
+          ${description}
+        </p>
+        <div style="font-size: 14px; color: #666;">
+          ${domain} · ${created}<br />
+          <a href="${originalLink}" style="font-size: 13px; color: #888;">Original</a>
         </div>
-        ${description ? `<div style="font-family: -apple-system, BlinkMacSystemFont, sans-serif; font-size: 16px; color: var(--text-color); margin-top: 8px; line-height: 1.5;">${description}</div>` : ''}
-        <div style="margin-top: 8px;"><a href="${originalLink}" style="font-size: 13px; color: var(--link-color); font-family: -apple-system, BlinkMacSystemFont, sans-serif;">Original →</a></div>
       </div>
     `;
-  };
-
-  const itemsHTML = [...recent, ...older].map(renderItem).join('');
+  }).join('\n');
 
   return `
     <html>
     <head>
-      <meta name="color-scheme" content="light dark">
       <style>
         :root {
           color-scheme: light dark;
-          --text-color: #000;
-          --muted-color: #666;
-          --link-color: #007aff;
-          --border-color: #e0e0e0;
-          background-color: #fff;
-        }
-        @media (prefers-color-scheme: dark) {
-          :root {
-            --text-color: #fff;
-            --muted-color: #aaa;
-            --link-color: #0a84ff;
-            --border-color: #333;
-            background-color: #000;
-          }
         }
         body {
+          font-family: ${fontStack};
+          font-size: 16px;
+          line-height: 1.5;
+          padding: 32px;
           margin: 0;
-          padding: 40px;
-          font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-          background-color: var(--background-color);
+          background-color: #fff;
+          color: #000;
+        }
+        @media (prefers-color-scheme: dark) {
+          body {
+            background-color: #000;
+            color: #fff;
+          }
+        }
+        a {
+          color: inherit;
+          text-decoration: underline;
         }
       </style>
     </head>
     <body>
-      <h1 style="font-family: -apple-system, BlinkMacSystemFont, sans-serif; font-size: 24px; color: var(--text-color);">Your Daily Raindrop Digest</h1>
+      <h1 style="font-size: 24px; margin-bottom: 24px;">Your Raindrop Digest</h1>
       ${itemsHTML}
     </body>
     </html>
   `;
 }
 
-async function sendEmail(subject, html) {
+async function sendEmail(html) {
   const transporter = nodemailer.createTransport({
     host: SMTP_HOST,
     port: SMTP_PORT,
-    secure: true,
+    secure: SMTP_PORT == 465,
     auth: {
       user: SMTP_USER,
-      pass: SMTP_PASS,
-    },
+      pass: SMTP_PASS
+    }
   });
 
   await transporter.sendMail({
     from: EMAIL_FROM,
     to: EMAIL_TO,
-    subject,
-    html,
+    subject: 'Your Daily Raindrop Digest',
+    html
   });
 }
 
-(async () => {
+function pickRandom(items, count) {
+  const copy = [...items];
+  const result = [];
+  while (result.length < count && copy.length > 0) {
+    const index = Math.floor(Math.random() * copy.length);
+    result.push(copy.splice(index, 1)[0]);
+  }
+  return result;
+}
+
+function getRecentAndRandom(items) {
+  const sorted = [...items].sort((a, b) => new Date(b.created) - new Date(a.created));
+  const recent = sorted.slice(0, 5);
+  const remaining = sorted.slice(5);
+  const random = pickRandom(remaining, 2);
+  return [...recent, ...random];
+}
+
+async function main() {
   try {
     console.log('Fetching items...');
-    const items = await getRaindropItems();
-    const sorted = items.sort((a, b) => new Date(b.created) - new Date(a.created));
-
-    const recent = sorted.slice(0, 5);
-    const olderPool = sorted.slice(10);
-    const older = olderPool.sort(() => 0.5 - Math.random()).slice(0, 2);
-
-    const html = buildHTMLDigest(recent, older);
-    await sendEmail('Your Daily Raindrop Digest', html);
-    console.log('Digest sent!');
+    const items = await getRaindropItems(COLLECTION_ID);
+    const selectedItems = getRecentAndRandom(items);
+    const html = formatHTML(selectedItems);
+    await sendEmail(html);
+    console.log('Digest sent.');
   } catch (error) {
     console.error('Error sending digest:', error);
-    process.exit(1);
   }
-})();
+}
+
+main();
