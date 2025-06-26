@@ -1,4 +1,3 @@
-// raindrop-digest.js
 import axios from 'axios';
 import nodemailer from 'nodemailer';
 import dayjs from 'dayjs';
@@ -13,15 +12,44 @@ const TO_EMAIL = process.env.TO_EMAIL;
 const FROM_EMAIL = process.env.FROM_EMAIL;
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
-const fetchBookmarks = async () => {
+const getRaindropItems = async () => {
   const response = await axios.get(
     `https://api.raindrop.io/rest/v1/raindrops/${COLLECTION_ID}`,
     {
-      headers: { Authorization: `Bearer ${RAINDROP_TOKEN}` },
-      params: { perpage: 100, sort: '-created' },
+      headers: {
+        Authorization: `Bearer ${RAINDROP_TOKEN}`,
+      },
     }
   );
-  return response.data.items;
+
+  const items = response.data.items;
+
+  // Fetch each item's full metadata including notes
+  const enrichedItems = await Promise.all(
+    items.map(async (item) => {
+      try {
+        const itemResponse = await axios.get(
+          `https://api.raindrop.io/rest/v1/raindrop/${item._id}`,
+          {
+            headers: {
+              Authorization: `Bearer ${RAINDROP_TOKEN}`,
+            },
+          }
+        );
+        return {
+          ...item,
+          note: itemResponse.data.item.note || '',
+        };
+      } catch (e) {
+        return {
+          ...item,
+          note: '',
+        };
+      }
+    })
+  );
+
+  return enrichedItems;
 };
 
 const summarize = async (text) => {
@@ -182,7 +210,7 @@ const sendEmail = async (html) => {
 
 const main = async () => {
   try {
-    const allItems = await fetchBookmarks();
+    const allItems = await getRaindropItems();
     const recentItems = allItems.filter((item) =>
       dayjs(item.created) > dayjs().subtract(1, 'day')
     );
