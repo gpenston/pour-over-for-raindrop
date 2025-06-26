@@ -3,7 +3,7 @@ name: Send Raindrop Digest
 on:
   schedule:
     - cron: '0 14 * * *' # every day at 7:00am PT / 10:00am ET
-  workflow_dispatch:     # lets you trigger it manually from GitHub
+  workflow_dispatch:     # allows manual trigger
 
 jobs:
   send:
@@ -18,7 +18,7 @@ jobs:
           node-version: 20
 
       - name: Install dependencies
-        run: npm ci
+        run: npm install
 
       - name: Send digest email
         run: node raindrop-digest.js
