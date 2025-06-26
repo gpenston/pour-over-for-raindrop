@@ -1,149 +1,134 @@
 // raindrop-digest.js
-import axios from 'axios';
-import nodemailer from 'nodemailer';
 import dotenv from 'dotenv';
-import dayjs from 'dayjs';
-
 dotenv.config();
 
+import axios from 'axios';
+import nodemailer from 'nodemailer';
+import dayjs from 'dayjs';
+
+const RAINDROP_TOKEN = process.env.RAINDROP_TOKEN;
 const COLLECTION_ID = process.env.COLLECTION_ID;
 const ARCHIVE_COLLECTION_ID = process.env.ARCHIVE_COLLECTION_ID;
-const RAINDROP_TOKEN = process.env.RAINDROP_TOKEN;
-const EMAIL_TO = process.env.EMAIL_TO;
-const EMAIL_FROM = process.env.EMAIL_FROM;
-const SMTP_USER = process.env.SMTP_USER;
-const SMTP_PASS = process.env.SMTP_PASS;
+const TO_EMAIL = process.env.TO_EMAIL;
+const FROM_EMAIL = process.env.FROM_EMAIL;
 const SMTP_HOST = process.env.SMTP_HOST;
 const SMTP_PORT = process.env.SMTP_PORT;
+const SMTP_USER = process.env.SMTP_USER;
+const SMTP_PASS = process.env.SMTP_PASS;
 
-async function getRaindropItems(collectionId) {
-  const res = await axios.get(`https://api.raindrop.io/rest/v1/raindrops/${collectionId}`, {
-    headers: {
-      Authorization: `Bearer ${RAINDROP_TOKEN}`
-    }
-  });
-  return res.data.items;
-}
+const getRaindropItems = async () => {
+  const url = `https://api.raindrop.io/rest/v1/raindrops/${COLLECTION_ID}?perpage=100&sort=-created`;
+  const headers = { Authorization: `Bearer ${RAINDROP_TOKEN}` };
+  const response = await axios.get(url, { headers });
+  return response.data.items || [];
+};
 
-function buildPreviewLink(item) {
-  return `https://app.raindrop.io/my/${item.collection.$id}/item/${item._id}/preview`;
-}
+const buildEmailHTML = (items) => {
+  const styles = `
+    <style>
+      @media (prefers-color-scheme: dark) {
+        body { background: #000; color: #fff; }
+        a { color: #4ea8ff; }
+      }
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif;
+        margin: 2em;
+        line-height: 1.5;
+        color: #111;
+      }
+      .item {
+        margin-bottom: 2em;
+        padding-bottom: 1em;
+        border-bottom: 1px solid #ccc;
+      }
+      .item h2 {
+        margin: 0;
+        font-size: 1.2em;
+      }
+      .item p {
+        margin: 0.5em 0 0 0;
+      }
+      .source-link {
+        font-size: 0.9em;
+        color: #666;
+      }
+    </style>
+  `;
 
-function formatDate(date) {
-  return dayjs(date).format('MMM D, YYYY');
-}
-
-function formatHTML(items) {
-  const fontStack = "-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif";
-
-  const itemsHTML = items.map(item => {
-    const previewUrl = buildPreviewLink(item);
+  const entries = items.map(item => {
+    const safeTitle = item.title || item.link;
+    const safeDescription = item.excerpt ? item.excerpt.trim() : '';
+    const previewUrl = `https://app.raindrop.io/my/${item.collection?.$id || COLLECTION_ID}/item/${item._id}/preview`;
     const originalLink = item.link;
-    const title = item.title || originalLink;
-    const description = item.excerpt || '';
     const domain = new URL(originalLink).hostname.replace('www.', '');
-    const created = formatDate(item.created);
 
     return `
-      <div style="margin-bottom: 24px;">
-        <h2 style="margin: 0 0 4px; font-size: 20px; line-height: 1.3;">
-          <a href="${previewUrl}" style="color: inherit; text-decoration: none;">${title}</a>
-        </h2>
-        <p style="margin: 4px 0 8px; font-size: 16px; line-height: 1.5; color: inherit;">
-          ${description}
-        </p>
-        <div style="font-size: 14px; color: #666;">
-          ${domain} · ${created}<br />
-          <a href="${originalLink}" style="font-size: 13px; color: #888;">Original</a>
-        </div>
+      <div class="item">
+        <h2><a href="${previewUrl}">${safeTitle}</a></h2>
+        ${safeDescription ? `<p>${safeDescription}</p>` : ''}
+        <p class="source-link"><a href="${originalLink}" target="_blank">Original ↗</a> &middot; ${domain}</p>
       </div>
     `;
   }).join('\n');
 
-  return `
+  return `<!DOCTYPE html>
     <html>
-    <head>
-      <style>
-        :root {
-          color-scheme: light dark;
-        }
-        body {
-          font-family: ${fontStack};
-          font-size: 16px;
-          line-height: 1.5;
-          padding: 32px;
-          margin: 0;
-          background-color: #fff;
-          color: #000;
-        }
-        @media (prefers-color-scheme: dark) {
-          body {
-            background-color: #000;
-            color: #fff;
-          }
-        }
-        a {
-          color: inherit;
-          text-decoration: underline;
-        }
-      </style>
-    </head>
-    <body>
-      <h1 style="font-size: 24px; margin-bottom: 24px;">Your Raindrop Digest</h1>
-      ${itemsHTML}
-    </body>
-    </html>
-  `;
-}
+      <head>${styles}</head>
+      <body>
+        <h1>Raindrop Daily Digest</h1>
+        ${entries}
+      </body>
+    </html>`;
+};
 
-async function sendEmail(html) {
+const sendEmail = async (html) => {
   const transporter = nodemailer.createTransport({
     host: SMTP_HOST,
     port: SMTP_PORT,
-    secure: SMTP_PORT == 465,
+    secure: true,
     auth: {
       user: SMTP_USER,
       pass: SMTP_PASS
     }
   });
 
-  await transporter.sendMail({
-    from: EMAIL_FROM,
-    to: EMAIL_TO,
-    subject: 'Your Daily Raindrop Digest',
+  const info = await transporter.sendMail({
+    from: FROM_EMAIL,
+    to: TO_EMAIL,
+    subject: 'Your Raindrop Daily Digest',
     html
   });
-}
 
-function pickRandom(items, count) {
-  const copy = [...items];
-  const result = [];
-  while (result.length < count && copy.length > 0) {
-    const index = Math.floor(Math.random() * copy.length);
-    result.push(copy.splice(index, 1)[0]);
-  }
-  return result;
-}
+  console.log('Email sent:', info.messageId);
+};
 
-function getRecentAndRandom(items) {
-  const sorted = [...items].sort((a, b) => new Date(b.created) - new Date(a.created));
-  const recent = sorted.slice(0, 5);
-  const remaining = sorted.slice(5);
-  const random = pickRandom(remaining, 2);
-  return [...recent, ...random];
-}
-
-async function main() {
+const main = async () => {
   try {
     console.log('Fetching items...');
-    const items = await getRaindropItems(COLLECTION_ID);
-    const selectedItems = getRecentAndRandom(items);
-    const html = formatHTML(selectedItems);
+    const allItems = await getRaindropItems();
+    console.log('Total fetched:', allItems.length);
+
+    const now = dayjs();
+    const recentItems = allItems.filter(item => dayjs(item.created) > now.subtract(36, 'hour')).slice(0, 5);
+    const olderItems = allItems.filter(item => dayjs(item.created) <= now.subtract(7, 'day'));
+    const randomItems = olderItems.sort(() => 0.5 - Math.random()).slice(0, 2);
+
+    console.log('Recent items:', recentItems.length);
+    console.log('Random items:', randomItems.length);
+
+    const digestItems = [...recentItems, ...randomItems];
+    if (digestItems.length === 0) {
+      console.log('No items to include. Skipping email.');
+      return;
+    }
+
+    const html = buildEmailHTML(digestItems);
+    console.log('Sending email to:', TO_EMAIL);
     await sendEmail(html);
-    console.log('Digest sent.');
   } catch (error) {
     console.error('Error sending digest:', error);
+    process.exit(1);
   }
-}
+};
 
 main();
