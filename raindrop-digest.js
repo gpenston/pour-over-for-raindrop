@@ -1,4 +1,4 @@
-// raindrop-digest.js (enhanced version)
+// raindrop-digest.js (cleaned-up version)
 import axios from 'axios';
 import nodemailer from 'nodemailer';
 import dayjs from 'dayjs';
@@ -6,16 +6,11 @@ import dayjs from 'dayjs';
 const {
   RAINDROP_TOKEN,
   COLLECTION_ID,
-  ARCHIVE_COLLECTION_ID,
   SMTP_USER,
   SMTP_PASS,
   TO_EMAIL,
-  FROM_EMAIL,
-  GH_PAT,
+  FROM_EMAIL
 } = process.env;
-
-const GITHUB_WEBHOOK_URL = 'https://api.github.com/repos/gpenston/raindrop-digest/dispatches';
-const WEBHOOK_SECRET = 'digest123'; // feel free to change this
 
 const fetchBookmarks = async () => {
   const res = await axios.get(
@@ -44,7 +39,6 @@ const fetchBookmarks = async () => {
     }
   }
 
-  // pick 2 random older items
   const shuffled = older.sort(() => 0.5 - Math.random());
   const randomOlder = shuffled.slice(0, 2);
 
@@ -72,14 +66,6 @@ const buildHTML = (items) => {
         const readTime = excerpt ? estimateReadTime(excerpt) : '';
         const tags = item.tags?.length ? item.tags.map(tag => `<span style="background:#eee;border-radius:4px;padding:2px 6px;margin-right:5px;font-size:12px;color:#555;">${tag}</span>`).join('') : '';
         const image = item.cover || (item.media && item.media[0]?.link);
-        const markReadLink = `https://api.github.com/repos/gpenston/raindrop-digest/dispatches`;
-        const payload = JSON.stringify({
-          event_type: 'mark_as_read',
-          client_payload: {
-            raindrop_id: item._id,
-            token: WEBHOOK_SECRET
-          }
-        });
 
         return `
           <div style="margin-bottom: 2em;">
@@ -88,10 +74,6 @@ const buildHTML = (items) => {
             <div style="font-size: 14px; color: #444; margin-top: 0.3em;">${excerpt}</div>
             <div style="font-size: 12px; color: #888; margin-top: 0.4em;">${domain} · Saved on ${date}${readTime ? ` · ${readTime}` : ''}</div>
             ${tags ? `<div style="margin-top: 0.4em;">${tags}</div>` : ''}
-            <form action="${markReadLink}" method="POST">
-              <input type="hidden" name="payload" value='${payload.replace(/'/g, '&apos;')}' />
-              <button type="submit" style="margin-top:8px;font-size:12px;padding:4px 8px;background:#eee;border:none;border-radius:4px;color:#333;cursor:pointer;">Mark as Read</button>
-            </form>
           </div>`;
       }).join('')}
     </div>`;
