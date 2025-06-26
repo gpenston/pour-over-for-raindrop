@@ -10,7 +10,6 @@ const SMTP_USER = process.env.SMTP_USER;
 const SMTP_PASS = process.env.SMTP_PASS;
 const TO_EMAIL = process.env.TO_EMAIL;
 const FROM_EMAIL = process.env.FROM_EMAIL;
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
 const getRaindropItems = async () => {
   const response = await axios.get(
@@ -24,7 +23,6 @@ const getRaindropItems = async () => {
 
   const items = response.data.items;
 
-  // Fetch each item's full metadata including notes
   const enrichedItems = await Promise.all(
     items.map(async (item) => {
       try {
@@ -36,63 +34,14 @@ const getRaindropItems = async () => {
             },
           }
         );
-        return {
-          ...item,
-          note: itemResponse.data.item.note || '',
-        };
+        return { ...item, note: itemResponse.data.item.note || '' };
       } catch (e) {
-        return {
-          ...item,
-          note: '',
-        };
+        return { ...item, note: '' };
       }
     })
   );
 
   return enrichedItems;
-};
-
-const summarize = async (text) => {
-  if (!text || !OPENAI_API_KEY) return null;
-  try {
-    const completion = await axios.post(
-      'https://api.openai.com/v1/chat/completions',
-      {
-        model: 'gpt-4o',
-        messages: [
-          {
-            role: 'system',
-            content: 'Summarize the following article excerpt in 1-2 sentences:',
-          },
-          { role: 'user', content: text },
-        ],
-        temperature: 0.7,
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${OPENAI_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-      }
-    );
-    return completion.data.choices[0].message.content.trim();
-  } catch (err) {
-    console.error('Error generating summary:', err.message);
-    return null;
-  }
-};
-
-const updateRaindropNote = async (id, summary) => {
-  if (!summary) return;
-  try {
-    await axios.put(
-      `https://api.raindrop.io/rest/v1/raindrop/${id}`,
-      { note: `—— AI Summary ——\n${summary}` },
-      { headers: { Authorization: `Bearer ${RAINDROP_TOKEN}` } }
-    );
-  } catch (err) {
-    console.error(`Failed to update Raindrop note for ${id}:`, err.message);
-  }
 };
 
 const buildHTML = (items) => {
@@ -167,8 +116,7 @@ const buildHTML = (items) => {
       const domain = new URL(item.link).hostname.replace('www.', '');
       const favicon = `https://www.google.com/s2/favicons?sz=32&domain=${domain}`;
       const previewUrl = `https://app.raindrop.io/my/${COLLECTION_ID}/item/${item._id}/preview`;
-      const hasSummary = item.note && item.note.includes('—— AI Summary ——');
-      const summaryContent = hasSummary ? item.note.replace('—— AI Summary ——', '').trim() : '';
+      const summaryContent = item.excerpt ? item.excerpt.trim() : '';
       return `
         <div class="item">
           ${item.cover ? `<img src="${item.cover}" style="max-width:100%; border-radius:10px; margin-bottom:1rem;" />` : ''}
@@ -219,14 +167,6 @@ const main = async () => {
     );
     const randomOld = olderItems.sort(() => 0.5 - Math.random()).slice(0, 2);
     const picks = [...recentItems.slice(0, 5), ...randomOld];
-
-    for (let item of picks) {
-      const summary = await summarize(item.excerpt || item.title);
-      if (summary) {
-        item.note = `—— AI Summary ——\n${summary}`;
-        await updateRaindropNote(item._id, summary);
-      }
-    }
 
     const html = buildHTML(picks);
     await sendEmail(html);
