@@ -1,10 +1,16 @@
 {
   "name": "raindrop-digest",
   "version": "1.0.0",
+  "description": "Daily email digest from Raindrop.io with summaries and formatting",
   "type": "module",
+  "main": "raindrop-digest.js",
+  "scripts": {
+    "start": "node raindrop-digest.js"
+  },
   "dependencies": {
-    "axios": "^1.6.0",
-    "nodemailer": "^6.9.0",
-    "dayjs": "^1.11.10"
+    "axios": "^1.6.8",
+    "dayjs": "^1.11.10",
+    "dotenv": "^16.3.1",
+    "nodemailer": "^6.9.8"
   }
 }
