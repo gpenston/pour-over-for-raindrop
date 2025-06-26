@@ -1,26 +1,27 @@
-name: Send Weekly Raindrop Digest
+name: Send Raindrop Digest
 
 on:
   schedule:
-    - cron: '0 15 * * 1'  # Every Monday at 8am PT (15:00 UTC)
-  workflow_dispatch:      # Allow manual runs
+    - cron: '0 14 * * *' # every day at 7:00am PT / 10:00am ET
+  workflow_dispatch:     # lets you trigger it manually from GitHub
 
 jobs:
-  send-digest:
+  send:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - name: Checkout repo
+        uses: actions/checkout@v3
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v3
         with:
-          node-version: '20'
+          node-version: 20
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
-      - name: Run digest script
+      - name: Send digest email
+        run: node raindrop-digest.js
         env:
           RAINDROP_TOKEN: ${{ secrets.RAINDROP_TOKEN }}
           COLLECTION_ID: ${{ secrets.COLLECTION_ID }}
@@ -28,4 +29,4 @@ jobs:
           SMTP_PASS: ${{ secrets.SMTP_PASS }}
           TO_EMAIL: ${{ secrets.TO_EMAIL }}
           FROM_EMAIL: ${{ secrets.FROM_EMAIL }}
-        run: node raindrop-digest.js
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
