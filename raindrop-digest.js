@@ -1,4 +1,4 @@
-// raindrop-digest.js with full-width background-safe email layout
+// raindrop-digest.js — modern Apple Mail–friendly email layout with dark mode support
 import axios from 'axios';
 import nodemailer from 'nodemailer';
 import dayjs from 'dayjs';
@@ -107,43 +107,134 @@ const summarize = async (item) => {
 };
 
 const buildHTML = async (items) => {
-  if (!items.length) return '<p>No new Read Later items this week.</p>';
+  const head = `
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #ffffff;
+        --text: #1c1c1e;
+        --subtext: #555;
+        --link: #0a84ff;
+      }
 
-  const htmlBlocks = await Promise.all(items.map(async (item) => {
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #1c1c1e;
+          --text: #f5f5f7;
+          --subtext: #999;
+          --link: #4da8ff;
+        }
+      }
+
+      body {
+        margin: 0;
+        padding: 2rem;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        font-size: 16px;
+        background: var(--bg);
+        color: var(--text);
+      }
+
+      .container {
+        max-width: 600px;
+        margin: 0 auto;
+      }
+
+      h2 {
+        font-size: 22px;
+        font-weight: 600;
+        margin-bottom: 1rem;
+      }
+
+      .card {
+        margin-bottom: 2.5rem;
+      }
+
+      .card img {
+        max-width: 100%;
+        border-radius: 8px;
+        margin-bottom: 0.75rem;
+      }
+
+      .card a {
+        font-weight: 600;
+        font-size: 17px;
+        color: var(--link);
+        text-decoration: none;
+      }
+
+      .excerpt {
+        font-size: 15px;
+        margin-top: 0.3rem;
+      }
+
+      .summary {
+        font-size: 14px;
+        font-style: italic;
+        color: var(--subtext);
+        margin-top: 0.5rem;
+      }
+
+      .meta {
+        font-size: 13px;
+        color: var(--subtext);
+        margin-top: 0.4rem;
+      }
+
+      .tags {
+        margin-top: 0.4rem;
+      }
+
+      .tags span {
+        background: #333;
+        color: #bbb;
+        font-size: 12px;
+        border-radius: 4px;
+        padding: 2px 6px;
+        margin-right: 5px;
+      }
+    </style>
+  `;
+
+  const body = await Promise.all(items.map(async (item) => {
     const url = new URL(item.link);
     const domain = url.hostname.replace(/^www\./, '');
     const title = item.title || item.link;
     const excerpt = item.excerpt || '';
     const date = new Date(item.created).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
     const readTime = excerpt ? estimateReadTime(excerpt) : '';
-    const tags = item.tags?.length ? item.tags.map(tag => `<span style="background:#333;border-radius:4px;padding:2px 6px;margin-right:5px;font-size:12px;color:#bbb;">${tag}</span>`).join('') : '';
+    const tags = item.tags?.length ? item.tags.map(tag => `<span>${tag}</span>`).join('') : '';
     const image = item.cover || (item.media && item.media[0]?.link);
     const summary = await summarize(item);
 
     return `
-      <div style="margin-bottom: 2em;">
-        ${image ? `<img src="${image}" alt="" style="max-width:100%;border-radius:8px;margin-bottom:0.75em;" />` : ''}
-        <a href="${item.link}" style="font-size: 17px; font-weight: 600; color: #4da8ff; text-decoration: none;">${title}</a>
-        <div style="font-size: 14px; color: #f5f5f7; margin-top: 0.3em;">${excerpt}</div>
-        ${summary ? `<div style="font-size: 13px; color: #d0d0d0; margin-top: 0.5em; font-style: italic;">Summary: ${summary}</div>` : ''}
-        <div style="font-size: 12px; color: #888; margin-top: 0.4em;">${domain} · Saved on ${date}${readTime ? ` · ${readTime}` : ''}</div>
-        ${tags ? `<div style="margin-top: 0.4em;">${tags}</div>` : ''}
-      </div>`;
+      <div class="card">
+        ${image ? `<img src="${image}" alt="" />` : ''}
+        <a href="${item.link}">${title}</a>
+        ${excerpt ? `<div class="excerpt">${excerpt}</div>` : ''}
+        ${summary ? `<div class="summary">Summary: ${summary}</div>` : ''}
+        <div class="meta">${domain} · Saved on ${date}${readTime ? ` · ${readTime}` : ''}</div>
+        ${tags ? `<div class="tags">${tags}</div>` : ''}
+      </div>
+    `;
   }));
 
   return `
-    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #1c1c1e; padding: 0; margin: 0;">
-      <tr>
-        <td align="center">
-          <table width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;padding: 1em; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #f5f5f7;">
-            <tr><td>
-              <h2 style="color: #f5f5f7;">Your Read Later Digest</h2>
-              ${htmlBlocks.join('')}
-            </td></tr>
-          </table>
-        </td>
-      </tr>
-    </table>`;
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        ${head}
+      </head>
+      <body>
+        <div class="container">
+          <h2>Your Read Later Digest</h2>
+          ${body.join('')}
+        </div>
+      </body>
+    </html>
+  `;
 };
 
 const sendEmail = async (html, subject) => {
