@@ -1,10 +1,10 @@
 // raindrop-digest.js
 import dotenv from 'dotenv';
+dotenv.config();
+
 import axios from 'axios';
 import nodemailer from 'nodemailer';
 import dayjs from 'dayjs';
-
-dotenv.config();
 
 const COLLECTION_ID = process.env.COLLECTION_ID;
 const RAINDROP_TOKEN = process.env.RAINDROP_TOKEN;
@@ -23,7 +23,7 @@ async function getRaindropItems() {
   return data.items;
 }
 
-// Build the email HTML content
+// Build the email HTML
 function buildEmailHtml(items) {
   const fontFamily = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
   const linkColor = '#4ba3fa';
@@ -51,7 +51,6 @@ function buildEmailHtml(items) {
     const domain = new URL(item.link).hostname.replace('www.', '');
     const favicon = `https://www.google.com/s2/favicons?domain=${domain}&sz=32`;
     const savedDate = dayjs(item.created).format('MMM D');
-    const readTime = item.excerpt ? `${Math.ceil(item.excerpt.split(/\s+/).length / 200)} min read` : '';
 
     return `
       <div class="item">
@@ -62,7 +61,6 @@ function buildEmailHtml(items) {
           <img class="icon" src="${favicon}" alt="favicon" />
           <a href="https://${domain}" style="color: inherit; text-decoration: none;">${domain}</a>
           <span>• Saved on ${savedDate}</span>
-          ${readTime ? `<span>• ${readTime}</span>` : ''}
         </div>
         <hr />
       </div>
