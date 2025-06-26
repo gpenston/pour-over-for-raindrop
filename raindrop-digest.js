@@ -2,7 +2,6 @@ import axios from 'axios';
 import nodemailer from 'nodemailer';
 import dayjs from 'dayjs';
 
-// --- CONFIG FROM ENV VARS ---
 const {
   RAINDROP_TOKEN,
   COLLECTION_ID,
@@ -31,6 +30,12 @@ const fetchBookmarks = async () => {
   return res.data.items.filter(item => item.created >= since);
 };
 
+const estimateReadTime = (text) => {
+  const words = text.split(/\s+/).length;
+  const minutes = Math.ceil(words / 200);
+  return minutes <= 1 ? '1 min read' : `${minutes} min read`;
+};
+
 const buildHTML = (items) => {
   if (!items.length) return '<p>No new Read Later items this week.</p>';
 
@@ -45,9 +50,15 @@ const buildHTML = (items) => {
         const title = item.title || item.link;
         const excerpt = item.excerpt || '';
         const date = new Date(item.created).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+        const readTime = excerpt ? estimateReadTime(excerpt) : '';
+        const tags = item.tags && item.tags.length > 0
+          ? item.tags.map(tag => `<span style="background: #eee; border-radius: 4px; padding: 2px 6px; margin-right: 5px; font-size: 12px; color: #555;">${tag}</span>`).join('')
+          : '';
+        const image = item.cover || (item.media && item.media[0]?.link);
 
         return `
-          <div style="margin-bottom: 1.5em;">
+          <div style="margin-bottom: 2em;">
+            ${image ? `<img src="${image}" alt="" style="max-width: 100%; height: auto; border-radius: 8px; margin-bottom: 0.75em;" />` : ''}
             <a href="${item.link}" style="font-size: 17px; font-weight: 600; color: #0077cc; text-decoration: none;">
               ${title}
             </a>
@@ -55,8 +66,9 @@ const buildHTML = (items) => {
               ${excerpt}
             </div>
             <div style="font-size: 12px; color: #888; margin-top: 0.4em;">
-              ${domain} · Saved on ${date}
+              ${domain} · Saved on ${date}${readTime ? ` · ${readTime}` : ''}
             </div>
+            ${tags ? `<div style="margin-top: 0.4em;">${tags}</div>` : ''}
           </div>
         `;
       }).join('')}
