@@ -29,7 +29,7 @@ const fetchBookmarks = async () => {
 
   const recent = [];
   const older = [];
-  const cutoff = dayjs().subtract(7, 'day');
+  const cutoff = dayjs().subtract(1, 'day');
 
   for (const item of res.data.items) {
     const created = dayjs(item.created);
@@ -272,7 +272,7 @@ const main = async () => {
   try {
     const items = await fetchBookmarks();
     const html = await buildHTML(items);
-    const subject = `Your Read Later Digest: ${dayjs().subtract(7, 'day').format('MMM D')} – ${dayjs().format('MMM D')}`;
+    const subject = `Your Read Later Digest: ${dayjs().subtract(1, 'day').format('MMM D')} – ${dayjs().format('MMM D')}`;
     await sendEmail(html, subject);
     console.log('Digest sent successfully.');
   } catch (err) {
