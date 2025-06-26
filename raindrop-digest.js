@@ -1,10 +1,10 @@
 // raindrop-digest.js
 import dotenv from 'dotenv';
-dotenv.config();
-
 import axios from 'axios';
 import nodemailer from 'nodemailer';
 import dayjs from 'dayjs';
+
+dotenv.config();
 
 const COLLECTION_ID = process.env.COLLECTION_ID;
 const RAINDROP_TOKEN = process.env.RAINDROP_TOKEN;
@@ -13,7 +13,7 @@ const SMTP_PASS = process.env.SMTP_PASS;
 const FROM_EMAIL = process.env.FROM_EMAIL;
 const TO_EMAIL = process.env.TO_EMAIL;
 
-// Fetch items from Raindrop.io
+// Fetch items from Raindrop.io with debug logging
 async function getRaindropItems() {
   console.log('🔍 Fetching items...');
   const url = `https://api.raindrop.io/rest/v1/raindrops/${COLLECTION_ID}?perpage=50&sort=-created`;
@@ -21,13 +21,11 @@ async function getRaindropItems() {
     headers: { Authorization: `Bearer ${RAINDROP_TOKEN}` },
   });
   console.log(`🔢 Fetched ${data.items.length} items from Raindrop`);
-  // Optionally log titles for debugging:
-  console.log('🗒 Item titles:', data.items.slice(0,5).map(i => i.title));
+  console.log('🗒 Item titles:', data.items.slice(0, 5).map(i => i.title));
   return data.items;
 }
-}
 
-// Build the email HTML
+// Build the email HTML content
 function buildEmailHtml(items) {
   const fontFamily = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
   const linkColor = '#4ba3fa';
@@ -44,7 +42,7 @@ function buildEmailHtml(items) {
     .item { margin-bottom: 3rem; }
     img.preview { width: 100%; border-radius: 12px; margin-bottom: 1rem; }
     .title { font-size: 1.25rem; font-weight: 600; margin: 0 0 0.5rem; color: ${linkColor}; }
-    .description { font-size: 0.95rem; line-height: 1.5; margin-bottom: 0.75rem; color: inherit; }
+    .description { font-size: 0.95rem; line-height: 1.5; margin-bottom: 0.75rem; }
     .meta { font-size: 0.85rem; color: #555; display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem; }
     img.icon { width: 16px; height: 16px; vertical-align: text-bottom; }
     hr { border: none; border-top: 1px solid #ccc; margin: 2rem 0; }
@@ -71,7 +69,7 @@ function buildEmailHtml(items) {
     `;
   }).join('');
 
-  return `
+  const html = `
     <!DOCTYPE html>
     <html lang="en">
     <head>
@@ -86,10 +84,16 @@ function buildEmailHtml(items) {
     </body>
     </html>
   `;
+
+  console.log(`📄 Generated email HTML length: ${html.length}`);
+  console.log('🔍 Preview snippet:', html.slice(0, 200) + '...');
+
+  return html;
 }
 
-// Send the email via iCloud SMTP
+// Send the email via iCloud SMTP with debug logs
 async function sendDigestEmail(html) {
+  console.log('🔌 Setting up SMTP transport…');
   const transporter = nodemailer.createTransport({
     host: 'smtp.mail.me.com',
     port: 587,
@@ -97,32 +101,40 @@ async function sendDigestEmail(html) {
     auth: { user: SMTP_USER, pass: SMTP_PASS }
   });
 
-  await transporter.verify();
-  console.log('✅ SMTP connection successful');
+  try {
+    console.log('🔍 Verifying SMTP connection…');
+    await transporter.verify();
+    console.log('✅ SMTP connection successful');
+  } catch (verifyErr) {
+    console.error('❌ SMTP verify failed:', verifyErr);
+    throw verifyErr;
+  }
 
-  const info = await transporter.sendMail({
-    from: FROM_EMAIL,
-    to: TO_EMAIL,
-    subject: `Your Read Later Digest — ${dayjs().format('MMM D, YYYY')}`,
-    html
-  });
-
-  console.log('📧 Message sent:', info.messageId);
+  console.log(`✉️ About to send email from ${FROM_EMAIL} to ${TO_EMAIL}`);
+  try {
+    const info = await transporter.sendMail({
+      from: FROM_EMAIL,
+      to: TO_EMAIL,
+      subject: `Your Read Later Digest — ${dayjs().format('MMM D, YYYY')}`,
+      html
+    });
+    console.log('📧 Message sent:', info.messageId);
+  } catch (sendErr) {
+    console.error('❌ sendMail failed:', sendErr);
+    throw sendErr;
+  }
 }
 
-// Main execution: fetch and send only the latest N items regardless of time
+// Main execution: send latest N items
 (async () => {
   try {
     const items = await getRaindropItems();
     console.log(`Total fetched: ${items.length}`);
     const latestCount = 7;
     const latestItems = items.slice(0, latestCount);
-    console.log(`Latest items: ${latestItems.length}`);
+    console.log(`Latest items selected: ${latestItems.length}`);
 
     const html = buildEmailHtml(latestItems);
-    console.log(`📄 Generated email HTML length: ${html.length}`);
-    console.log('🔍 Preview snippet:', html.slice(0,200) + '...');
-    console.log(`✉️ Sending digest to: ${TO_EMAIL}`);
     await sendDigestEmail(html);
     console.log('✅ Digest sent!');
   } catch (err) {
