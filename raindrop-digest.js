@@ -1,9 +1,12 @@
+// raindrop-digest.js
 import dotenv from 'dotenv';
 dotenv.config();
 
 import axios from 'axios';
 import nodemailer from 'nodemailer';
 import dayjs from 'dayjs';
+import readingTime from 'reading-time';
+import { JSDOM } from 'jsdom';
 
 const COLLECTION_ID = process.env.COLLECTION_ID;
 const RAINDROP_TOKEN = process.env.RAINDROP_TOKEN;
@@ -12,7 +15,6 @@ const SMTP_PASS = process.env.SMTP_PASS;
 const FROM_EMAIL = process.env.FROM_EMAIL;
 const TO_EMAIL = process.env.TO_EMAIL;
 
-// Fetch Raindrop.io items
 async function getRaindropItems() {
   const url = `https://api.raindrop.io/rest/v1/raindrops/${COLLECTION_ID}?perpage=50&sort=-created`;
   const response = await axios.get(url, {
@@ -21,7 +23,19 @@ async function getRaindropItems() {
   return response.data.items;
 }
 
-// Build the email HTML
+async function fetchArticleReadTime(link) {
+  try {
+    const res = await axios.get(link);
+    const dom = new JSDOM(res.data);
+    const text = dom.window.document.body.textContent || '';
+    const stats = readingTime(text);
+    return stats.text; // e.g. '3 min read'
+  } catch (err) {
+    console.error('Error fetching article for read time:', err.message);
+    return '';
+  }
+}
+
 function buildEmailHtml(items) {
   const fontFamily = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
   const linkColor = '#4ba3fa';
@@ -56,6 +70,7 @@ function buildEmailHtml(items) {
         font-size: 1.25rem;
         font-weight: 600;
         margin: 0 0 0.5rem;
+        color: ${linkColor};
       }
       .description {
         font-size: 0.95rem;
@@ -89,20 +104,18 @@ function buildEmailHtml(items) {
     const domain = new URL(item.link).hostname.replace('www.', '');
     const favicon = `https://www.google.com/s2/favicons?domain=${domain}&sz=32`;
     const savedDate = dayjs(item.created).format('MMM D');
-    const readTime = item.excerpt ? `${Math.ceil(item.excerpt.split(/\s+/).length / 200)} min read` : '';
+    const readTimeText = item.readTime || '';
 
     return `
       <div class="item">
         ${item.cover ? `<img class="preview" src="${item.cover}" alt="cover" />` : ''}
-        <a class="title" href="${previewUrl}" style="color: ${linkColor}; text-decoration: none;">
-          ${item.title}
-        </a>
+        <a class="title" href="${previewUrl}"><h2>${item.title}</h2></a>
         ${item.excerpt ? `<div class="description">${item.excerpt}</div>` : ''}
         <div class="meta">
           <img class="icon" src="${favicon}" alt="favicon" />
-          <a href="https://${domain}" style="color: inherit; text-decoration: none;">${domain}</a>
+          <a href="https://${domain}">${domain}</a>
           <span>• Saved on ${savedDate}</span>
-          ${readTime ? `<span>• ${readTime}</span>` : ''}
+          ${readTimeText ? `<span>• ${readTimeText}</span>` : ''}
         </div>
         <hr />
       </div>
@@ -126,7 +139,6 @@ function buildEmailHtml(items) {
   `;
 }
 
-// Send email via iCloud SMTP
 async function sendDigestEmail(html) {
   const transporter = nodemailer.createTransport({
     host: 'smtp.mail.me.com',
@@ -146,7 +158,6 @@ async function sendDigestEmail(html) {
   });
 }
 
-// Main function
 (async () => {
   try {
     const items = await getRaindropItems();
@@ -154,9 +165,14 @@ async function sendDigestEmail(html) {
     const recent = items.slice(0, 5);
     const older = items.slice(5);
     const random = older.sort(() => Math.random() - 0.5).slice(0, 2);
-    console.log(`Recent items: ${recent.length}, Random items: ${random.length}`);
+    const selected = [...recent, ...random];
 
-    const html = buildEmailHtml([...recent, ...random]);
+    // Fetch full article read times
+    for (const item of selected) {
+      item.readTime = await fetchArticleReadTime(item.link);
+    }
+
+    const html = buildEmailHtml(selected);
     console.log(`Sending digest to: ${TO_EMAIL}`);
     await sendDigestEmail(html);
     console.log('Digest sent!');
