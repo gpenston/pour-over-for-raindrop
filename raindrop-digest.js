@@ -112,9 +112,16 @@ const buildHTML = (items) => {
       font-size: 0.875rem;
     }
     .summary {
-      margin-top: 0.5rem;
+      margin-top: 0.75rem;
       font-style: italic;
       color: var(--subtext);
+      line-height: 1.4;
+    }
+    .original-link {
+      font-size: 12px;
+      color: var(--subtext);
+      margin-top: 4px;
+      display: block;
     }
     hr {
       border: none;
@@ -129,18 +136,19 @@ const buildHTML = (items) => {
     .map((item) => {
       const domain = new URL(item.link).hostname.replace('www.', '');
       const favicon = `https://www.google.com/s2/favicons?sz=32&domain=${domain}`;
+      const previewUrl = `https://app.raindrop.io/my/${COLLECTION_ID}/item/${item._id}/preview`;
+      const hasSummary = item.note && item.note.includes('—— AI Summary ——');
+      const summaryContent = hasSummary ? item.note.replace('—— AI Summary ——', '').trim() : '';
       return `
         <div class="item">
           ${item.cover ? `<img src="${item.cover}" style="max-width:100%; border-radius:10px; margin-bottom:1rem;" />` : ''}
-          <h2>
-            <a href="${item.link}">${item.title}</a>
-            <span style="font-size: 12px;"> (<a href="https://app.raindrop.io/${item._id}">Edit</a>)</span>
-          </h2>
+          <h2><a href="${previewUrl}">${item.title}</a></h2>
+          <a class="original-link" href="${item.link}">(Original)</a>
           <div class="meta">
             <img src="${favicon}" style="width:16px;height:16px;vertical-align:middle;margin-right:4px;" />
             ${domain} · Saved on ${dayjs(item.created).format('MMM D')} · ${item.excerpt?.split(' ').length || 200 / 200} min read
           </div>
-          ${item.note ? `<blockquote class="summary">${item.note}</blockquote>` : ''}
+          ${hasSummary ? `<blockquote class="summary">${summaryContent}</blockquote>` : ''}
         </div>
         <hr />
       `;
@@ -185,7 +193,7 @@ const main = async () => {
     for (let item of picks) {
       const summary = await summarize(item.excerpt);
       if (summary) {
-        item.note = `“${summary}”`;
+        item.note = `—— AI Summary ——\n${summary}`;
         await updateRaindropNote(item._id, summary);
       }
     }
