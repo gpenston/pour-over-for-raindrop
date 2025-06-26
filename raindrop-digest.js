@@ -225,7 +225,7 @@ const buildHTML = async (items) => {
     return `
       <div class="card">
         ${image ? `<img src="${image}" alt="" class="preview" />` : ''}
-        <a href="${item.link}">${title}</a>
+        <a href="https://app.raindrop.io/${item._id}">${title}</a>
         ${excerpt ? `<div class="excerpt">${excerpt}</div>` : ''}
         ${summary ? `<blockquote class="summary">${summary}</blockquote>` : ''}
         <div class="meta">
@@ -272,7 +272,7 @@ const main = async () => {
   try {
     const items = await fetchBookmarks();
     const html = await buildHTML(items);
-    const subject = `Your Read Later Digest: ${dayjs().subtract(1, 'day').format('MMM D')} – ${dayjs().format('MMM D')}`;
+    const subject = `Your Read Later Digest: ${dayjs().format('MMM D')}`;
     await sendEmail(html, subject);
     console.log('Digest sent successfully.');
   } catch (err) {
