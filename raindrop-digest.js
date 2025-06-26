@@ -1,4 +1,4 @@
-// raindrop-digest.js with GPT summaries saved to Raindrop notes
+// raindrop-digest.js with hardcoded dark-mode-friendly styling
 import axios from 'axios';
 import nodemailer from 'nodemailer';
 import dayjs from 'dayjs';
@@ -116,40 +116,24 @@ const buildHTML = async (items) => {
     const excerpt = item.excerpt || '';
     const date = new Date(item.created).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
     const readTime = excerpt ? estimateReadTime(excerpt) : '';
-    const tags = item.tags?.length ? item.tags.map(tag => `<span style="background:#ddd;border-radius:4px;padding:2px 6px;margin-right:5px;font-size:12px;color:#444;">${tag}</span>`).join('') : '';
+    const tags = item.tags?.length ? item.tags.map(tag => `<span style="background:#333;border-radius:4px;padding:2px 6px;margin-right:5px;font-size:12px;color:#bbb;">${tag}</span>`).join('') : '';
     const image = item.cover || (item.media && item.media[0]?.link);
     const summary = await summarize(item);
 
     return `
       <div style="margin-bottom: 2em;">
         ${image ? `<img src="${image}" alt="" style="max-width:100%;border-radius:8px;margin-bottom:0.75em;" />` : ''}
-        <a href="${item.link}" style="font-size: 17px; font-weight: 600; color: #0077cc; text-decoration: none;">${title}</a>
-        <div style="font-size: 14px; color: var(--text-color); margin-top: 0.3em;">${excerpt}</div>
-        ${summary ? `<div style="font-size: 13px; color: var(--text-color); margin-top: 0.5em; font-style: italic;">Summary: ${summary}</div>` : ''}
-        <div style="font-size: 12px; color: var(--subtext-color); margin-top: 0.4em;">${domain} · Saved on ${date}${readTime ? ` · ${readTime}` : ''}</div>
+        <a href="${item.link}" style="font-size: 17px; font-weight: 600; color: #4da8ff; text-decoration: none;">${title}</a>
+        <div style="font-size: 14px; color: #f5f5f7; margin-top: 0.3em;">${excerpt}</div>
+        ${summary ? `<div style="font-size: 13px; color: #d0d0d0; margin-top: 0.5em; font-style: italic;">Summary: ${summary}</div>` : ''}
+        <div style="font-size: 12px; color: #888; margin-top: 0.4em;">${domain} · Saved on ${date}${readTime ? ` · ${readTime}` : ''}</div>
         ${tags ? `<div style="margin-top: 0.4em;">${tags}</div>` : ''}
       </div>`;
   }));
 
   return `
-    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 1em; line-height: 1.6; background: var(--bg-color); color: var(--text-color);">
-      <style>
-        @media (prefers-color-scheme: dark) {
-          :root {
-            --bg-color: #1c1c1e;
-            --text-color: #f5f5f7;
-            --subtext-color: #a1a1aa;
-          }
-        }
-        @media (prefers-color-scheme: light) {
-          :root {
-            --bg-color: #ffffff;
-            --text-color: #1c1c1e;
-            --subtext-color: #555;
-          }
-        }
-      </style>
-      <h2>Your Read Later Digest</h2>
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #1c1c1e; color: #f5f5f7; padding: 1em; line-height: 1.6;">
+      <h2 style="color: #f5f5f7;">Your Read Later Digest</h2>
       ${htmlBlocks.join('')}
     </div>`;
 };
