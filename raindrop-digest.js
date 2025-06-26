@@ -1,175 +1,139 @@
+// raindrop-digest.js
 import axios from 'axios';
 import nodemailer from 'nodemailer';
-import dayjs from 'dayjs';
 import dotenv from 'dotenv';
+import { formatDistanceToNow } from 'date-fns';
 
 dotenv.config();
 
+const COLLECTION_ID = process.env.COLLECTION_ID;
+const ARCHIVE_ID = process.env.ARCHIVE_ID;
+const RAINDROP_TOKEN = process.env.RAINDROP_TOKEN;
+const SMTP_USER = process.env.SMTP_USER;
+const SMTP_PASS = process.env.SMTP_PASS;
+const SMTP_HOST = process.env.SMTP_HOST;
+const SMTP_PORT = parseInt(process.env.SMTP_PORT);
+const EMAIL_TO = process.env.EMAIL_TO;
+const EMAIL_FROM = process.env.EMAIL_FROM;
+
+if (!COLLECTION_ID) {
+  console.error('❌ COLLECTION_ID is missing. Set it in your env or GitHub Secrets.');
+  process.exit(1);
+}
+
 async function getRaindropItems() {
-  const response = await axios.get(
-    `https://api.raindrop.io/rest/v1/raindrops/${process.env.RAINDROP_COLLECTION}`,
-    {
-      headers: {
-        Authorization: `Bearer ${process.env.RAINDROP_TOKEN}`,
-      },
-    }
-  );
+  const url = `https://api.raindrop.io/rest/v1/raindrops/${COLLECTION_ID}`;
+  const res = await axios.get(url, {
+    headers: {
+      Authorization: `Bearer ${RAINDROP_TOKEN}`,
+    },
+  });
+  return res.data.items;
+}
 
-  const items = response.data.items;
+function buildPreviewLink(item) {
+  return `https://app.raindrop.io/my/${COLLECTION_ID}/item/${item._id}/preview`;
+}
 
-  const enrichedItems = await Promise.all(
-    items.map(async (item) => {
-      try {
-        const itemResponse = await axios.get(
-          `https://api.raindrop.io/rest/v1/raindrop/${item._id}`,
-          {
-            headers: {
-              Authorization: `Bearer ${process.env.RAINDROP_TOKEN}`,
-            },
+function buildOriginalLink(item) {
+  return item.link;
+}
+
+function buildHTMLDigest(recent, older) {
+  const renderItem = (item) => {
+    const timeAgo = formatDistanceToNow(new Date(item.created), { addSuffix: true });
+    const previewLink = buildPreviewLink(item);
+    const originalLink = buildOriginalLink(item);
+    const description = item.excerpt || '';
+    const domain = new URL(item.link).hostname.replace('www.', '');
+    const sourceIcon = `https://www.google.com/s2/favicons?domain=${domain}`;
+
+    return `
+      <div style="padding: 24px 0; border-bottom: 1px solid var(--border-color);">
+        <a href="${previewLink}" style="font-family: 'New York', Georgia, serif; font-size: 20px; font-weight: 600; color: var(--text-color); text-decoration: none;">${item.title}</a>
+        <div style="font-family: -apple-system, BlinkMacSystemFont, sans-serif; font-size: 14px; color: var(--muted-color); margin-top: 2px;">
+          <img src="${sourceIcon}" alt="" style="vertical-align: middle; height: 14px; margin-right: 4px;">${domain} • Saved ${timeAgo}
+        </div>
+        ${description ? `<div style="font-family: -apple-system, BlinkMacSystemFont, sans-serif; font-size: 16px; color: var(--text-color); margin-top: 8px; line-height: 1.5;">${description}</div>` : ''}
+        <div style="margin-top: 8px;"><a href="${originalLink}" style="font-size: 13px; color: var(--link-color); font-family: -apple-system, BlinkMacSystemFont, sans-serif;">Original →</a></div>
+      </div>
+    `;
+  };
+
+  const itemsHTML = [...recent, ...older].map(renderItem).join('');
+
+  return `
+    <html>
+    <head>
+      <meta name="color-scheme" content="light dark">
+      <style>
+        :root {
+          color-scheme: light dark;
+          --text-color: #000;
+          --muted-color: #666;
+          --link-color: #007aff;
+          --border-color: #e0e0e0;
+          background-color: #fff;
+        }
+        @media (prefers-color-scheme: dark) {
+          :root {
+            --text-color: #fff;
+            --muted-color: #aaa;
+            --link-color: #0a84ff;
+            --border-color: #333;
+            background-color: #000;
           }
-        );
-        return {
-          ...item,
-          note: itemResponse.data.item.note || '',
-          excerpt: itemResponse.data.item.excerpt || '',
-        };
-      } catch (e) {
-        return { ...item, note: '', excerpt: '' };
-      }
-    })
-  );
-
-  return enrichedItems;
-}
-
-function buildEmailHTML(items) {
-  const today = dayjs().format('MMM DD, YYYY');
-
-  const emailBody = `
-  <html>
-  <head>
-    <style>
-      @media (prefers-color-scheme: dark) {
+        }
         body {
-          background-color: #1e1e1e;
-          color: #ffffff;
+          margin: 0;
+          padding: 40px;
+          font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+          background-color: var(--background-color);
         }
-        .container {
-          background-color: #2c2c2e;
-        }
-        .link {
-          color: #7db4ff;
-        }
-        .meta {
-          color: #ccc;
-        }
-      }
-
-      @media (prefers-color-scheme: light) {
-        body {
-          background-color: #ffffff;
-          color: #000000;
-        }
-        .container {
-          background-color: #f2f2f7;
-        }
-        .link {
-          color: #007aff;
-        }
-        .meta {
-          color: #555;
-        }
-      }
-
-      .container {
-        font-family: -apple-system, BlinkMacSystemFont, 'San Francisco', 'Helvetica Neue', sans-serif;
-        max-width: 720px;
-        margin: 0 auto;
-        padding: 2rem;
-        border-radius: 12px;
-      }
-      h1 {
-        font-family: 'New York', Georgia, serif;
-      }
-      .item {
-        margin-bottom: 3rem;
-      }
-      .item img {
-        max-width: 100%;
-        border-radius: 12px;
-      }
-      .excerpt {
-        font-family: 'New York', Georgia, serif;
-        font-size: 1rem;
-        font-style: italic;
-        margin-top: 0.75rem;
-      }
-      .meta {
-        font-size: 0.875rem;
-      }
-      .original-link {
-        font-size: 0.8rem;
-        display: block;
-        margin-top: 0.25rem;
-      }
-    </style>
-  </head>
-  <body>
-    <div class="container">
-      <h1>Your Read Later Digest</h1>
-      ${items
-        .map(
-          (item) => `
-          <div class="item">
-            ${item.cover ? `<img src="${item.cover}" alt="" />` : ''}
-            <h2><a class="link" href="https://app.raindrop.io/my/${item.collection.id}/item/${item._id}/preview">${item.title}</a></h2>
-            ${item.excerpt ? `<div class="excerpt">${item.excerpt}</div>` : ''}
-            <div class="meta">
-              <a href="${item.link}" class="original-link">(Original)</a><br/>
-              ${new URL(item.link).hostname} • Saved on ${dayjs(item.created).format('MMM DD')} • ${item.readTime || '1'} min read
-            </div>
-          </div>
-        `
-        )
-        .join('')}
-    </div>
-  </body>
-  </html>
+      </style>
+    </head>
+    <body>
+      <h1 style="font-family: -apple-system, BlinkMacSystemFont, sans-serif; font-size: 24px; color: var(--text-color);">Your Daily Raindrop Digest</h1>
+      ${itemsHTML}
+    </body>
+    </html>
   `;
-
-  return emailBody;
 }
 
-async function sendEmail(digestHTML) {
-  let transporter = nodemailer.createTransport({
-    host: 'smtp.mail.me.com',
-    port: 587,
-    secure: false,
+async function sendEmail(subject, html) {
+  const transporter = nodemailer.createTransport({
+    host: SMTP_HOST,
+    port: SMTP_PORT,
+    secure: true,
     auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS,
+      user: SMTP_USER,
+      pass: SMTP_PASS,
     },
   });
 
   await transporter.sendMail({
-    from: `George Penston <${process.env.EMAIL_USER}>`,
-    to: process.env.EMAIL_TO,
-    subject: `Your Read Later Digest: ${dayjs().format('MMM DD')}`,
-    html: digestHTML,
+    from: EMAIL_FROM,
+    to: EMAIL_TO,
+    subject,
+    html,
   });
 }
 
 (async () => {
   try {
-    console.log("Fetching items...");
+    console.log('Fetching items...');
     const items = await getRaindropItems();
-    console.log(`Fetched ${items.length} items`);
-    const digestHTML = buildEmailHTML(items);
-    console.log("Sending email...");
-    await sendEmail(digestHTML);
-    console.log("Digest sent successfully!");
+    const sorted = items.sort((a, b) => new Date(b.created) - new Date(a.created));
+
+    const recent = sorted.slice(0, 5);
+    const olderPool = sorted.slice(10);
+    const older = olderPool.sort(() => 0.5 - Math.random()).slice(0, 2);
+
+    const html = buildHTMLDigest(recent, older);
+    await sendEmail('Your Daily Raindrop Digest', html);
+    console.log('Digest sent!');
   } catch (error) {
-    console.error("Error sending digest:", error);
+    console.error('Error sending digest:', error);
     process.exit(1);
   }
 })();
