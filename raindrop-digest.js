@@ -1,4 +1,4 @@
-// raindrop-digest.js — modern Apple Mail–friendly email layout with dark mode support
+// raindrop-digest.js — modern layout with favicons and editorial styling
 import axios from 'axios';
 import nodemailer from 'nodemailer';
 import dayjs from 'dayjs';
@@ -106,6 +106,11 @@ const summarize = async (item) => {
   }
 };
 
+const getFavicon = (link) => {
+  const { hostname } = new URL(link);
+  return `https://www.google.com/s2/favicons?sz=32&domain=${hostname}`;
+};
+
 const buildHTML = async (items) => {
   const head = `
     <style>
@@ -140,17 +145,17 @@ const buildHTML = async (items) => {
         margin: 0 auto;
       }
 
-      h2 {
-        font-size: 22px;
-        font-weight: 600;
-        margin-bottom: 1rem;
+      h2 { font-family: 'New York', Georgia, serif;
+        font-size: 26px;
+        font-weight: 500;
+        margin-bottom: 1.5rem;
       }
 
       .card {
         margin-bottom: 2.5rem;
       }
 
-      .card img {
+      .card img.preview {
         max-width: 100%;
         border-radius: 8px;
         margin-bottom: 0.75rem;
@@ -168,11 +173,14 @@ const buildHTML = async (items) => {
         margin-top: 0.3rem;
       }
 
-      .summary {
+      blockquote.summary {
         font-size: 14px;
         font-style: italic;
         color: var(--subtext);
         margin-top: 0.5rem;
+        margin-bottom: 0.5rem;
+        border-left: 3px solid var(--subtext);
+        padding-left: 1em;
       }
 
       .meta {
@@ -193,10 +201,16 @@ const buildHTML = async (items) => {
         padding: 2px 6px;
         margin-right: 5px;
       }
+
+      hr {
+        border: none;
+        border-top: 1px solid var(--subtext);
+        margin: 2rem 0;
+      }
     </style>
   `;
 
-  const body = await Promise.all(items.map(async (item) => {
+  const body = await Promise.all(items.map(async (item, index) => {
     const url = new URL(item.link);
     const domain = url.hostname.replace(/^www\./, '');
     const title = item.title || item.link;
@@ -206,16 +220,21 @@ const buildHTML = async (items) => {
     const tags = item.tags?.length ? item.tags.map(tag => `<span>${tag}</span>`).join('') : '';
     const image = item.cover || (item.media && item.media[0]?.link);
     const summary = await summarize(item);
+    const favicon = getFavicon(item.link);
 
     return `
       <div class="card">
-        ${image ? `<img src="${image}" alt="" />` : ''}
+        ${image ? `<img src="${image}" alt="" class="preview" />` : ''}
         <a href="${item.link}">${title}</a>
         ${excerpt ? `<div class="excerpt">${excerpt}</div>` : ''}
-        ${summary ? `<div class="summary">Summary: ${summary}</div>` : ''}
-        <div class="meta">${domain} · Saved on ${date}${readTime ? ` · ${readTime}` : ''}</div>
+        ${summary ? `<blockquote class="summary">${summary}</blockquote>` : ''}
+        <div class="meta">
+          <img src="${favicon}" style="width:16px;height:16px;vertical-align:middle;margin-right:6px;"/>
+          ${domain} · Saved on ${date}${readTime ? ` · ${readTime}` : ''}
+        </div>
         ${tags ? `<div class="tags">${tags}</div>` : ''}
       </div>
+      ${index < items.length - 1 ? '<hr />' : ''}
     `;
   }));
 
