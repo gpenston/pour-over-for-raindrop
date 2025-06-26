@@ -1,22 +1,16 @@
 import axios from 'axios';
 import nodemailer from 'nodemailer';
-import dayjs from 'dayjs';
+import { format } from 'date-fns';
 import dotenv from 'dotenv';
+
 dotenv.config();
 
-const RAINDROP_TOKEN = process.env.RAINDROP_TOKEN;
-const COLLECTION_ID = process.env.COLLECTION_ID;
-const SMTP_USER = process.env.SMTP_USER;
-const SMTP_PASS = process.env.SMTP_PASS;
-const TO_EMAIL = process.env.TO_EMAIL;
-const FROM_EMAIL = process.env.FROM_EMAIL;
-
-const getRaindropItems = async () => {
+async function getRaindropItems() {
   const response = await axios.get(
-    `https://api.raindrop.io/rest/v1/raindrops/${COLLECTION_ID}`,
+    `https://api.raindrop.io/rest/v1/raindrops/${process.env.RAINDROP_COLLECTION}`,
     {
       headers: {
-        Authorization: `Bearer ${RAINDROP_TOKEN}`,
+        Authorization: `Bearer ${process.env.RAINDROP_TOKEN}`,
       },
     }
   );
@@ -30,150 +24,148 @@ const getRaindropItems = async () => {
           `https://api.raindrop.io/rest/v1/raindrop/${item._id}`,
           {
             headers: {
-              Authorization: `Bearer ${RAINDROP_TOKEN}`,
+              Authorization: `Bearer ${process.env.RAINDROP_TOKEN}`,
             },
           }
         );
-        return { ...item, note: itemResponse.data.item.note || '' };
+        return {
+          ...item,
+          note: itemResponse.data.item.note || '',
+          excerpt: itemResponse.data.item.excerpt || '',
+        };
       } catch (e) {
-        return { ...item, note: '' };
+        return { ...item, note: '', excerpt: '' };
       }
     })
   );
 
   return enrichedItems;
-};
+}
 
-const buildHTML = (items) => {
-  return `
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="color-scheme" content="light dark">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <style>
-    :root {
-      color-scheme: light dark;
-      --bg: #ffffff;
-      --text: #000000;
-      --subtext: #555;
-      --link: #007aff;
-    }
-    @media (prefers-color-scheme: dark) {
-      :root {
-        --bg: #1c1c1e;
-        --text: #f5f5f7;
-        --subtext: #888;
-        --link: #4da8ff;
+function buildEmailHTML(items) {
+  const today = format(new Date(), 'MMM dd, yyyy');
+
+  const emailBody = `
+  <html>
+  <head>
+    <style>
+      @media (prefers-color-scheme: dark) {
+        body {
+          background-color: #1e1e1e;
+          color: #ffffff;
+        }
+        .container {
+          background-color: #2c2c2e;
+        }
+        .link {
+          color: #7db4ff;
+        }
+        .meta {
+          color: #ccc;
+        }
       }
-    }
-    body {
-      margin: 0;
-      font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      padding: 2rem;
-    }
-    h1 {
-      font-family: 'New York', Georgia, serif;
-      font-size: 26px;
-    }
-    a { color: var(--link); text-decoration: none; }
-    .item {
-      margin-bottom: 2rem;
-      background: var(--bg);
-      padding: 1.25rem;
-      border-radius: 12px;
-    }
-    .meta {
-      color: var(--subtext);
-      font-size: 0.875rem;
-    }
-    .summary {
-      margin-top: 0.75rem;
-      font-style: italic;
-      color: var(--subtext);
-      line-height: 1.4;
-    }
-    .original-link {
-      font-size: 12px;
-      color: var(--subtext);
-      margin-top: 4px;
-      display: block;
-    }
-    hr {
-      border: none;
-      border-top: 1px solid var(--subtext);
-      margin: 2rem 0;
-    }
-  </style>
-</head>
-<body>
-  <h1>Your Read Later Digest</h1>
-  ${items
-    .map((item) => {
-      const domain = new URL(item.link).hostname.replace('www.', '');
-      const favicon = `https://www.google.com/s2/favicons?sz=32&domain=${domain}`;
-      const previewUrl = `https://app.raindrop.io/my/${COLLECTION_ID}/item/${item._id}/preview`;
-      const summaryContent = item.excerpt ? item.excerpt.trim() : '';
-      return `
-        <div class="item">
-          ${item.cover ? `<img src="${item.cover}" style="max-width:100%; border-radius:10px; margin-bottom:1rem;" />` : ''}
-          <h2><a href="${previewUrl}">${item.title}</a></h2>
-          <a class="original-link" href="${item.link}">(Original)</a>
-          <div class="meta">
-            <img src="${favicon}" style="width:16px;height:16px;vertical-align:middle;margin-right:4px;" />
-            ${domain} · Saved on ${dayjs(item.created).format('MMM D')} · ${item.excerpt?.split(' ').length || 200 / 200} min read
-          </div>
-          ${summaryContent ? `<blockquote class="summary">${summaryContent}</blockquote>` : ''}
-        </div>
-        <hr />
-      `;
-    })
-    .join('')}
-</body>
-</html>
-  `;
-};
 
-const sendEmail = async (html) => {
+      @media (prefers-color-scheme: light) {
+        body {
+          background-color: #ffffff;
+          color: #000000;
+        }
+        .container {
+          background-color: #f2f2f7;
+        }
+        .link {
+          color: #007aff;
+        }
+        .meta {
+          color: #555;
+        }
+      }
+
+      .container {
+        font-family: -apple-system, BlinkMacSystemFont, 'San Francisco', 'Helvetica Neue', sans-serif;
+        max-width: 720px;
+        margin: 0 auto;
+        padding: 2rem;
+        border-radius: 12px;
+      }
+      h1 {
+        font-family: 'New York', Georgia, serif;
+      }
+      .item {
+        margin-bottom: 3rem;
+      }
+      .item img {
+        max-width: 100%;
+        border-radius: 12px;
+      }
+      .excerpt {
+        font-family: 'New York', Georgia, serif;
+        font-size: 1rem;
+        font-style: italic;
+        margin-top: 0.75rem;
+      }
+      .meta {
+        font-size: 0.875rem;
+      }
+      .original-link {
+        font-size: 0.8rem;
+        display: block;
+        margin-top: 0.25rem;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>Your Read Later Digest</h1>
+      ${items
+        .map(
+          (item) => `
+          <div class="item">
+            ${item.cover ? `<img src="${item.cover}" alt="" />` : ''}
+            <h2><a class="link" href="https://app.raindrop.io/my/${item.collection.id}/item/${item._id}/preview">${item.title}</a></h2>
+            ${item.excerpt ? `<div class="excerpt">${item.excerpt}</div>` : ''}
+            <div class="meta">
+              <a href="${item.link}" class="original-link">(Original)</a><br/>
+              ${new URL(item.link).hostname} • Saved on ${format(new Date(item.created), 'MMM dd')} • ${item.readTime || '1'} min read
+            </div>
+          </div>
+        `
+        )
+        .join('')}
+    </div>
+  </body>
+  </html>
+  `;
+
+  return emailBody;
+}
+
+async function sendEmail(digestHTML) {
   let transporter = nodemailer.createTransport({
     host: 'smtp.mail.me.com',
     port: 587,
     secure: false,
     auth: {
-      user: SMTP_USER,
-      pass: SMTP_PASS,
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASS,
     },
   });
 
   await transporter.sendMail({
-    from: FROM_EMAIL,
-    to: TO_EMAIL,
-    subject: `Your Read Later Digest: ${dayjs().format('MMM D')}`,
-    html,
+    from: `George Penston <${process.env.EMAIL_USER}>`,
+    to: process.env.EMAIL_TO,
+    subject: `Your Read Later Digest: ${format(new Date(), 'MMM dd')}`,
+    html: digestHTML,
   });
-};
+}
 
-const main = async () => {
+(async () => {
   try {
-    const allItems = await getRaindropItems();
-    const recentItems = allItems.filter((item) =>
-      dayjs(item.created) > dayjs().subtract(1, 'day')
-    );
-    const olderItems = allItems.filter((item) =>
-      dayjs(item.created) <= dayjs().subtract(1, 'day')
-    );
-    const randomOld = olderItems.sort(() => 0.5 - Math.random()).slice(0, 2);
-    const picks = [...recentItems.slice(0, 5), ...randomOld];
-
-    const html = buildHTML(picks);
-    await sendEmail(html);
-  } catch (err) {
-    console.error('Error sending digest:', err.message);
-    process.exit(1);
+    const items = await getRaindropItems();
+    const digestHTML = buildEmailHTML(items);
+    await sendEmail(digestHTML);
+    console.log('Digest sent!');
+  } catch (error) {
+    console.error('Error sending digest:', error);
   }
-};
-
-main();
+})();
