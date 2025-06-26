@@ -53,13 +53,16 @@ const buildHTML = (items) => {
 
 const sendEmail = async (html, subject) => {
   const transporter = nodemailer.createTransport({
-    host: 'smtp.gmail.com',
-    port: 465,
-    secure: true,
+    host: 'smtp.mail.me.com',
+    port: 587,
+    secure: false,
     auth: {
       user: SMTP_USER,
       pass: SMTP_PASS,
     },
+    tls: {
+      ciphers: 'SSLv3',
+    }
   });
 
   await transporter.sendMail({
