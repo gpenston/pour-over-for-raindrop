@@ -132,7 +132,10 @@ const buildHTML = (items) => {
       return `
         <div class="item">
           ${item.cover ? `<img src="${item.cover}" style="max-width:100%; border-radius:10px; margin-bottom:1rem;" />` : ''}
-          <a href="https://app.raindrop.io/${item._id}"><h2>${item.title}</h2></a>
+          <h2>
+            <a href="${item.link}">${item.title}</a>
+            <span style="font-size: 12px;"> (<a href="https://app.raindrop.io/${item._id}">Edit</a>)</span>
+          </h2>
           <div class="meta">
             <img src="${favicon}" style="width:16px;height:16px;vertical-align:middle;margin-right:4px;" />
             ${domain} · Saved on ${dayjs(item.created).format('MMM D')} · ${item.excerpt?.split(' ').length || 200 / 200} min read
