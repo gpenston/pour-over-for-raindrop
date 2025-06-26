@@ -73,9 +73,11 @@ const buildHTML = (items) => {
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta name="color-scheme" content="light dark">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
     :root {
+      color-scheme: light dark;
       --bg: #ffffff;
       --text: #000000;
       --subtext: #555;
@@ -148,7 +150,7 @@ const buildHTML = (items) => {
             <img src="${favicon}" style="width:16px;height:16px;vertical-align:middle;margin-right:4px;" />
             ${domain} · Saved on ${dayjs(item.created).format('MMM D')} · ${item.excerpt?.split(' ').length || 200 / 200} min read
           </div>
-          ${hasSummary ? `<blockquote class="summary">${summaryContent}</blockquote>` : ''}
+          ${summaryContent ? `<blockquote class="summary">${summaryContent}</blockquote>` : ''}
         </div>
         <hr />
       `;
@@ -191,7 +193,7 @@ const main = async () => {
     const picks = [...recentItems.slice(0, 5), ...randomOld];
 
     for (let item of picks) {
-      const summary = await summarize(item.excerpt);
+      const summary = await summarize(item.excerpt || item.title);
       if (summary) {
         item.note = `—— AI Summary ——\n${summary}`;
         await updateRaindropNote(item._id, summary);
