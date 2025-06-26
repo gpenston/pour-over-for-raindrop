@@ -1,0 +1,35 @@
+name: Mark Raindrop as Read
+
+on:
+  repository_dispatch:
+    types: [mark_as_read]
+
+jobs:
+  move-to-archive:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call Raindrop API to archive item
+        env:
+          RAINDROP_TOKEN: ${{ secrets.RAINDROP_TOKEN }}
+          ARCHIVE_COLLECTION_ID: 45122018
+          CLIENT_PAYLOAD: ${{ toJson(github.event.client_payload) }}
+        run: |
+          echo "$CLIENT_PAYLOAD" > payload.json
+
+          ID=$(jq -r '.raindrop_id' payload.json)
+          TOKEN=$(jq -r '.token' payload.json)
+
+          if [ "$TOKEN" != "digest123" ]; then
+            echo "Invalid token. Aborting."
+            exit 1
+          fi
+
+          echo "Moving Raindrop ID $ID to Archive Collection $ARCHIVE_COLLECTION_ID"
+
+          curl -X PUT \
+            -H "Authorization: Bearer $RAINDROP_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{\"collection\": { \"$id\": $ARCHIVE_COLLECTION_ID }}" \
+            https://api.raindrop.io/rest/v1/raindrop/$ID
+
+          echo "Item moved."
