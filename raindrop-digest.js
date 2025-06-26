@@ -1,5 +1,7 @@
+// raindrop-digest.js
 import axios from 'axios';
 import nodemailer from 'nodemailer';
+import dayjs from 'dayjs';
 import dotenv from 'dotenv';
 dotenv.config();
 
@@ -11,154 +13,134 @@ const SMTP_USER = process.env.SMTP_USER;
 const SMTP_PASS = process.env.SMTP_PASS;
 
 const getRaindropItems = async () => {
-  const response = await axios.get(`https://api.raindrop.io/rest/v1/raindrops/${COLLECTION_ID}`, {
+  const url = `https://api.raindrop.io/rest/v1/raindrops/${COLLECTION_ID}`;
+  const response = await axios.get(url, {
     headers: { Authorization: `Bearer ${RAINDROP_TOKEN}` },
   });
-  return response.data.items || [];
+  return response.data.items;
 };
 
-const formatDate = (dateString) => {
-  const options = { month: 'short', day: 'numeric' };
-  return new Date(dateString).toLocaleDateString('en-US', options);
-};
-
-const estimateReadingTime = (excerpt) => {
-  const words = excerpt?.split(/\s+/).length || 0;
-  const minutes = Math.ceil(words / 200);
-  return minutes > 0 ? `${minutes} min read` : '';
-};
-
-const generateEmailHTML = (items) => {
+const formatItemsToHTML = (items) => {
   const styles = `
     <style>
       body {
-        font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
+        font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+        margin: 0;
+        padding: 2rem;
         background-color: #fff;
         color: #000;
-        padding: 20px;
+      }
+      h1 {
+        font-family: 'New York', Georgia, serif;
+        font-size: 2rem;
+      }
+      a {
+        color: #007aff;
+        text-decoration: none;
+      }
+      .item {
+        margin-bottom: 3rem;
+        border-bottom: 1px solid #eee;
+        padding-bottom: 2rem;
+      }
+      .item img {
+        width: 100%;
+        border-radius: 12px;
+      }
+      .meta {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.9rem;
+        color: #555;
+        margin-top: 0.5rem;
+      }
+      .meta img {
+        width: 16px;
+        height: 16px;
+      }
+      .excerpt {
+        margin-top: 0.75rem;
+        font-size: 0.95rem;
       }
       @media (prefers-color-scheme: dark) {
         body {
           background-color: #000;
           color: #fff;
         }
-        .card {
-          background-color: #111;
-          border-color: #333;
-        }
-        .divider {
-          border-color: #333;
-        }
-      }
-      h1 {
-        font-family: 'New York', Georgia, serif;
-        font-size: 28px;
-        font-weight: bold;
-      }
-      .card {
-        margin: 40px 0;
-        padding-bottom: 20px;
-        border-bottom: 1px solid #eee;
-      }
-      .title {
-        font-size: 18px;
-        font-weight: 600;
-        margin: 20px 0 8px;
-        color: #0077ee;
-        font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
-      }
-      .meta {
-        font-size: 14px;
-        color: gray;
-        margin: 0 0 12px;
-      }
-      .excerpt {
-        font-size: 15px;
-        line-height: 1.5;
-        margin-bottom: 16px;
-      }
-      .image {
-        max-width: 100%;
-        border-radius: 16px;
-      }
-      .divider {
-        border-top: 1px solid #eee;
-        margin: 24px 0;
-      }
-      a {
-        color: #0077ee;
-        text-decoration: none;
+        a { color: #4da3ff; }
+        .meta { color: #aaa; }
+        .item { border-color: #333; }
       }
     </style>
   `;
 
-  const itemsHTML = items.map((item) => {
-    const { link, title, excerpt, cover, domain, created, time } = item;
-    const sourceFavicon = `https://www.google.com/s2/favicons?sz=32&domain_url=${domain}`;
-    const formattedDate = formatDate(created);
-    const readingTime = estimateReadingTime(excerpt);
+  const content = items.map((item) => {
+    const domain = new URL(item.link).hostname.replace('www.', '');
+    const favicon = `https://icons.duckduckgo.com/ip3/${domain}.ico`;
+    const timeSaved = dayjs(item.created).format('MMM D');
+    const readTime = item.excerpt?.split(' ').length > 300 ? '3+ min read' : '1–2 min read';
+
     return `
-      <div class="card">
-        ${cover ? `<img src="${cover}" class="image" alt="cover image" />` : ''}
-        <div class="title"><a href="${link}">${title}</a></div>
-        ${excerpt ? `<div class="excerpt">${excerpt}</div>` : ''}
+      <div class="item">
+        ${item.cover ? `<img src="${item.cover}" alt="cover">` : ''}
+        <h2><a href="${item.link}" target="_blank">${item.title}</a></h2>
+        ${item.excerpt ? `<div class="excerpt">${item.excerpt}</div>` : ''}
         <div class="meta">
-          <img src="${sourceFavicon}" width="16" height="16" style="vertical-align: middle; margin-right: 6px;" />
-          <a href="https://${domain}">${domain}</a> &bull; Saved on ${formattedDate}${readingTime ? ` &bull; ${readingTime}` : ''}
+          <img src="${favicon}" alt="icon">
+          <a href="https://${domain}">${domain}</a> • Saved on ${timeSaved} • ${readTime}
         </div>
       </div>
     `;
-  }).join('\n');
+  }).join('');
 
   return `
     <html>
-    <head>${styles}</head>
-    <body>
-      <h1>Your Read Later Digest</h1>
-      ${itemsHTML}
-    </body>
+      <head>${styles}</head>
+      <body>
+        <h1>Your Read Later Digest</h1>
+        ${content}
+      </body>
     </html>
   `;
 };
 
-const sendEmail = async (html) => {
+const sendDigestEmail = async (html) => {
   const transporter = nodemailer.createTransport({
     host: 'smtp.mail.me.com',
     port: 587,
     secure: false,
     auth: {
       user: SMTP_USER,
-      pass: SMTP_PASS,
-    },
+      pass: SMTP_PASS
+    }
   });
 
   await transporter.sendMail({
     from: FROM_EMAIL,
     to: TO_EMAIL,
     subject: 'Your Read Later Digest',
-    html,
+    html
   });
 };
 
-const runDigest = async () => {
+const main = async () => {
   try {
     console.log('Fetching items...');
     const items = await getRaindropItems();
     console.log(`Total fetched: ${items.length}`);
 
-    const recentItems = items.slice(0, 5);
-    const randomItems = items.slice(5).sort(() => 0.5 - Math.random()).slice(0, 2);
-    console.log(`Recent items: ${recentItems.length}`);
-    console.log(`Random items: ${randomItems.length}`);
+    const recent = items.slice(0, 5);
+    const older = items.slice(5).sort(() => 0.5 - Math.random()).slice(0, 2);
+    const digest = [...recent, ...older];
 
-    const digestItems = [...recentItems, ...randomItems];
-    const html = generateEmailHTML(digestItems);
-    console.log(`Sending email to: ${TO_EMAIL}`);
-    await sendEmail(html);
-  } catch (error) {
-    console.error('Error sending digest:', error);
+    const html = formatItemsToHTML(digest);
+    await sendDigestEmail(html);
+    console.log('Email sent!');
+  } catch (err) {
+    console.error('Error sending digest:', err);
     process.exit(1);
   }
 };
 
-runDigest();
+main();
