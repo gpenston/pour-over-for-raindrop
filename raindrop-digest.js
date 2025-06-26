@@ -1,9 +1,6 @@
-// raindrop-digest.js
 import axios from 'axios';
-import dayjs from 'dayjs';
-import dotenv from 'dotenv';
 import nodemailer from 'nodemailer';
-
+import dotenv from 'dotenv';
 dotenv.config();
 
 const RAINDROP_TOKEN = process.env.RAINDROP_TOKEN;
@@ -13,100 +10,118 @@ const FROM_EMAIL = process.env.FROM_EMAIL;
 const SMTP_USER = process.env.SMTP_USER;
 const SMTP_PASS = process.env.SMTP_PASS;
 
-async function getRaindropItems() {
-  const url = `https://api.raindrop.io/rest/v1/raindrops/${COLLECTION_ID}`;
-  const response = await axios.get(url, {
-    headers: {
-      Authorization: `Bearer ${RAINDROP_TOKEN}`,
-    },
+const getRaindropItems = async () => {
+  const response = await axios.get(`https://api.raindrop.io/rest/v1/raindrops/${COLLECTION_ID}`, {
+    headers: { Authorization: `Bearer ${RAINDROP_TOKEN}` },
   });
-  return response.data.items;
-}
+  return response.data.items || [];
+};
 
-function pickRecentAndRandom(items, recentCount = 5, randomCount = 2) {
-  const sorted = [...items].sort(
-    (a, b) => new Date(b.created) - new Date(a.created)
-  );
-  const recent = sorted.slice(0, recentCount);
-  const remaining = sorted.slice(recentCount);
-  const random = [];
-  const used = new Set();
+const formatDate = (dateString) => {
+  const options = { month: 'short', day: 'numeric' };
+  return new Date(dateString).toLocaleDateString('en-US', options);
+};
 
-  while (random.length < randomCount && remaining.length > 0) {
-    const i = Math.floor(Math.random() * remaining.length);
-    if (!used.has(i)) {
-      random.push(remaining[i]);
-      used.add(i);
-    }
-  }
-  return [...recent, ...random];
-}
+const estimateReadingTime = (excerpt) => {
+  const words = excerpt?.split(/\s+/).length || 0;
+  const minutes = Math.ceil(words / 200);
+  return minutes > 0 ? `${minutes} min read` : '';
+};
 
-function formatItem(item) {
-  const link = item.link;
-  const title = item.title || '(Untitled)';
-  const domain = new URL(link).hostname.replace('www.', '');
-  const domainIcon = `https://icons.duckduckgo.com/ip3/${domain}.ico`;
-  const excerpt = item.excerpt || '';
-  const created = dayjs(item.created).format('MMM D');
-  const time = item.extra?.time || '';
-  const timeText = time ? ` • ${time} min read` : '';
-  const cover = item.cover ? `<img src="${item.cover}" alt="cover image" style="max-width: 100%; border-radius: 12px; margin: 1rem 0;">` : '';
-
-  return `
-    <div style="margin-bottom: 3rem;">
-      ${cover}
-      <a href="${link}" style="font-size: 1.25rem; font-weight: 600; text-decoration: none; color: #0077ee; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
-        ${title}
-      </a>
-      <div style="color: #666; font-size: 0.9rem; margin: 0.5rem 0;">
-        <img src="${domainIcon}" width="16" height="16" style="vertical-align: middle; margin-right: 6px;">
-        <a href="https://${domain}" style="color: #666; text-decoration: none;">${domain}</a>
-        <span style="margin-left: 6px;"> • Saved on ${created}${timeText}</span>
-      </div>
-      <div style="margin-top: 0.5rem; font-size: 0.95rem; line-height: 1.5; color: #444;">${excerpt}</div>
-      <hr style="margin-top: 2rem; opacity: 0.2;">
-    </div>
-  `;
-}
-
-function createEmailHtml(items) {
-  const articlesHtml = items.map(formatItem).join('');
-
-  return `
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-      <meta charset="UTF-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>Read Later Digest</title>
-      <style>
+const generateEmailHTML = (items) => {
+  const styles = `
+    <style>
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
+        background-color: #fff;
+        color: #000;
+        padding: 20px;
+      }
+      @media (prefers-color-scheme: dark) {
         body {
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-          padding: 2rem;
-          background: #fff;
-          color: #000;
+          background-color: #000;
+          color: #fff;
         }
-        @media (prefers-color-scheme: dark) {
-          body {
-            background: #121212;
-            color: #f0f0f0;
-          }
-          a {
-            color: #4dabf7;
-          }
+        .card {
+          background-color: #111;
+          border-color: #333;
         }
-      </style>
-    </head>
+        .divider {
+          border-color: #333;
+        }
+      }
+      h1 {
+        font-family: 'New York', Georgia, serif;
+        font-size: 28px;
+        font-weight: bold;
+      }
+      .card {
+        margin: 40px 0;
+        padding-bottom: 20px;
+        border-bottom: 1px solid #eee;
+      }
+      .title {
+        font-size: 18px;
+        font-weight: 600;
+        margin: 20px 0 8px;
+        color: #0077ee;
+        font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
+      }
+      .meta {
+        font-size: 14px;
+        color: gray;
+        margin: 0 0 12px;
+      }
+      .excerpt {
+        font-size: 15px;
+        line-height: 1.5;
+        margin-bottom: 16px;
+      }
+      .image {
+        max-width: 100%;
+        border-radius: 16px;
+      }
+      .divider {
+        border-top: 1px solid #eee;
+        margin: 24px 0;
+      }
+      a {
+        color: #0077ee;
+        text-decoration: none;
+      }
+    </style>
+  `;
+
+  const itemsHTML = items.map((item) => {
+    const { link, title, excerpt, cover, domain, created, time } = item;
+    const sourceFavicon = `https://www.google.com/s2/favicons?sz=32&domain_url=${domain}`;
+    const formattedDate = formatDate(created);
+    const readingTime = estimateReadingTime(excerpt);
+    return `
+      <div class="card">
+        ${cover ? `<img src="${cover}" class="image" alt="cover image" />` : ''}
+        <div class="title"><a href="${link}">${title}</a></div>
+        ${excerpt ? `<div class="excerpt">${excerpt}</div>` : ''}
+        <div class="meta">
+          <img src="${sourceFavicon}" width="16" height="16" style="vertical-align: middle; margin-right: 6px;" />
+          <a href="https://${domain}">${domain}</a> &bull; Saved on ${formattedDate}${readingTime ? ` &bull; ${readingTime}` : ''}
+        </div>
+      </div>
+    `;
+  }).join('\n');
+
+  return `
+    <html>
+    <head>${styles}</head>
     <body>
-      <h1 style="font-family: 'New York', Georgia, serif; font-size: 2rem; font-weight: bold;">Your Read Later Digest</h1>
-      ${articlesHtml}
+      <h1>Your Read Later Digest</h1>
+      ${itemsHTML}
     </body>
     </html>
   `;
-}
+};
 
-async function sendEmail(html) {
+const sendEmail = async (html) => {
   const transporter = nodemailer.createTransport({
     host: 'smtp.mail.me.com',
     port: 587,
@@ -123,23 +138,27 @@ async function sendEmail(html) {
     subject: 'Your Read Later Digest',
     html,
   });
-}
+};
 
-(async () => {
+const runDigest = async () => {
   try {
     console.log('Fetching items...');
-    const allItems = await getRaindropItems();
-    console.log(`Total fetched: ${allItems.length}`);
-    const picked = pickRecentAndRandom(allItems);
-    console.log(`Recent items: ${picked.slice(0, 5).length}`);
-    console.log(`Random items: ${picked.slice(5).length}`);
+    const items = await getRaindropItems();
+    console.log(`Total fetched: ${items.length}`);
 
-    const html = createEmailHtml(picked);
+    const recentItems = items.slice(0, 5);
+    const randomItems = items.slice(5).sort(() => 0.5 - Math.random()).slice(0, 2);
+    console.log(`Recent items: ${recentItems.length}`);
+    console.log(`Random items: ${randomItems.length}`);
+
+    const digestItems = [...recentItems, ...randomItems];
+    const html = generateEmailHTML(digestItems);
     console.log(`Sending email to: ${TO_EMAIL}`);
     await sendEmail(html);
-    console.log('Email sent!');
-  } catch (err) {
-    console.error('Error sending digest:', err);
+  } catch (error) {
+    console.error('Error sending digest:', error);
     process.exit(1);
   }
-})();
+};
+
+runDigest();
