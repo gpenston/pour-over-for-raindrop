@@ -21,6 +21,7 @@ jobs:
         run: node raindrop-digest.js
         env:
           COLLECTION_ID:   ${{ secrets.COLLECTION_ID }}
+          ARCHIVE_ID:      ${{ secrets.ARCHIVE_ID }}
           RAINDROP_TOKEN:  ${{ secrets.RAINDROP_TOKEN }}
           NEWSAPI_KEY:     ${{ secrets.NEWSAPI_KEY }}  # Added for tag-driven recs
           SMTP_USER:       ${{ secrets.SMTP_USER }}
