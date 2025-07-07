@@ -2,7 +2,8 @@ name: Daily Raindrop Digest
 
 on:
   schedule:
-    - cron: '0 15 * * *'  # daily at 15:00 UTC
+    # Runs daily at 15:00 UTC (7 AM PDT)
+    - cron: '0 15 * * *'
   workflow_dispatch:
 
 jobs:
@@ -15,15 +16,14 @@ jobs:
         with:
           node-version: '20'
       - name: Install dependencies
-        run: npm install        # <--- changed from `npm ci`
+        run: npm install
       - name: Run digest script
         run: node raindrop-digest.js
         env:
-          COLLECTION_ID: ${{ secrets.COLLECTION_ID }}
-          RAINDROP_TOKEN: ${{ secrets.RAINDROP_TOKEN }}
-          SMTP_USER:      ${{ secrets.SMTP_USER }}
-          SMTP_PASS:      ${{ secrets.SMTP_PASS }}
-          FROM_EMAIL:     ${{ secrets.FROM_EMAIL }}
-          TO_EMAIL:       ${{ secrets.TO_EMAIL }}
-          ARCHIVE_ID:      ${{ secrets.ARCHIVE_ID }}
-          OPENAI_API_KEY:  ${{ secrets.OPENAI_API_KEY }}
+          COLLECTION_ID:   ${{ secrets.COLLECTION_ID }}
+          RAINDROP_TOKEN:  ${{ secrets.RAINDROP_TOKEN }}
+          NEWSAPI_KEY:     ${{ secrets.NEWSAPI_KEY }}  # Added for tag-driven recs
+          SMTP_USER:       ${{ secrets.SMTP_USER }}
+          SMTP_PASS:       ${{ secrets.SMTP_PASS }}
+          FROM_EMAIL:      ${{ secrets.FROM_EMAIL }}
+          TO_EMAIL:        ${{ secrets.TO_EMAIL }}
