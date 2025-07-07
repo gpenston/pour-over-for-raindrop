@@ -1,66 +1,67 @@
 // raindrop-digest.js
 import dotenv from 'dotenv';
-dotenv.config();
-
 import axios from 'axios';
 import nodemailer from 'nodemailer';
 import dayjs from 'dayjs';
 
-// Config
-const COLLECTION_ID  = process.env.COLLECTION_ID;
-const ARCHIVE_ID     = process.env.ARCHIVE_ID;
-const RAINDROP_TOKEN = process.env.RAINDROP_TOKEN;
-const NEWSAPI_KEY    = process.env.NEWSAPI_KEY;
-const SMTP_USER      = process.env.SMTP_USER;
-const SMTP_PASS      = process.env.SMTP_PASS;
-const FROM_EMAIL     = process.env.FROM_EMAIL;
-const TO_EMAIL       = process.env.TO_EMAIL;
+dotenv.config();
 
-// Fetch items
+// Config
+const COLLECTION_ID   = process.env.COLLECTION_ID;
+const ARCHIVE_ID      = process.env.ARCHIVE_ID;
+const RAINDROP_TOKEN  = process.env.RAINDROP_TOKEN;
+const OPENAI_API_KEY  = process.env.OPENAI_API_KEY;
+const SMTP_USER       = process.env.SMTP_USER;
+const SMTP_PASS       = process.env.SMTP_PASS;
+const FROM_EMAIL      = process.env.FROM_EMAIL;
+const TO_EMAIL        = process.env.TO_EMAIL;
+
+// Fetch items from a Raindrop collection
 async function getRaindropItems(collectionId, perpage = 50) {
   console.log(`🔍 Fetching items from ${collectionId}…`);
   const url = `https://api.raindrop.io/rest/v1/raindrops/${collectionId}?perpage=${perpage}&sort=-created`;
   const { data } = await axios.get(url, {
     headers: { Authorization: `Bearer ${RAINDROP_TOKEN}` }
   });
-  console.log(`🔢 ${data.items.length} fetched.`);
+  console.log(`🔢 Fetched ${data.items.length} items.`);
   return data.items;
 }
 
-// Recommendations
-async function getTagRecommendations(items, topTagCount = 10, perTag = 2) {
-  const tagCount = {};
-  items.forEach(it => (it.tags || []).forEach(tag => tagCount[tag] = (tagCount[tag] || 0) + 1));
-  const topTags = Object.entries(tagCount)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, topTagCount)
-    .map(([tag]) => tag);
-  console.log(`🔝 Top tags: ${topTags.join(', ')}`);
+// Ask OpenAI for recommendations
+async function getRecommendations(tags, count = 5) {
+  console.log(`💡 Generating ${count} recs for tags: ${tags.join(', ')}`);
+  const prompt = `Here are my top tags: ${tags.join(', ')}. ` +
+                 `Suggest ${count} recent, high-quality articles not already in my Read Later list. ` +
+                 `Respond with a JSON array of objects having "title" and "url" fields.`;
 
-  const recs = [];
-  for (const tag of topTags) {
-    if (recs.length >= 5) break;
-    try {
-      console.log(`🌐 Searching NewsAPI for "${tag}"…`);
-      const { data } = await axios.get('https://newsapi.org/v2/everything', {
-        params: { q: tag, pageSize: perTag, apiKey: NEWSAPI_KEY }
-      });
-      data.articles.forEach(a => {
-        if (recs.length < 5) recs.push({ title: a.title, url: a.url, tag });
-      });
-    } catch (e) {
-      const code = e.response?.status;
-      console.warn(`⚠️ ${tag} failed: ${code || e.message}`);
-    }
-    await new Promise(r => setTimeout(r, 600));
+  const res = await axios.post(
+    'https://api.openai.com/v1/chat/completions',
+    {
+      model: 'gpt-4o-mini',
+      messages: [
+        { role: 'system', content: 'You are a helpful recommendation engine.' },
+        { role: 'user',   content: prompt }
+      ],
+      temperature: 0.7,
+      max_tokens: 500
+    },
+    { headers: { Authorization: `Bearer ${OPENAI_API_KEY}` } }
+  );
+
+  const text = res.data.choices[0].message.content.trim();
+  try {
+    const recs = JSON.parse(text);
+    console.log(`✅ Parsed ${recs.length} recs from OpenAI.`);
+    return recs;
+  } catch (e) {
+    console.warn('⚠️ Failed to parse JSON from OpenAI response.');
+    return [];
   }
-  console.log(`✅ Got ${recs.length} recs.`);
-  return recs;
 }
 
-// Build HTML
+// Build HTML email
 function buildEmailHtml(items, recs = []) {
-  const font = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
+  const font = `-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif`;
   const linkColor = '#4ba3fa';
   const styles = `<style>
     body{font-family:${font};margin:0;padding:32px;background:#fff;color:#000}
@@ -75,66 +76,51 @@ function buildEmailHtml(items, recs = []) {
     .tag{background:#eee;border-radius:3px;padding:2px 6px;font-size:.75rem;color:#555}
     img.icon{width:12px;height:12px;vertical-align:text-bottom}
     hr{border:none;border-top:1px solid #ccc;margin:2rem 0}
-    a.tag-link{text-decoration:none;color:inherit}
   </style>`;
 
   const mainHtml = items.map(it => {
-    const cover = it.cover ? `<img class="preview" src="${it.cover}" alt="cover"/>` : '';
-    const previewUrl = `https://app.raindrop.io/my/${COLLECTION_ID}/item/${it._id}/preview`;
-    const domain = new URL(it.link).hostname.replace('www.', '');
-    const icon = `https://www.google.com/s2/favicons?domain=${domain}&sz=32`;
-    const date = dayjs(it.created).format('MMM D');
-    const tag = it.tags?.[0] || '';
-    return `
-      <div class="item">
-        ${cover}
-        <a class="title" href="${previewUrl}">${it.title}</a>
-        ${it.excerpt ? `<div class="description">${it.excerpt}</div>` : ''}
-        <div class="meta">
-          <img class="icon" src="${icon}" alt="favicon"/>
-          <a href="https://${domain}" style="color:inherit;text-decoration:none">${domain}</a>
-          <span>• Saved on ${date}</span>
-          ${tag ? `<a class="tag-link" href="https://app.raindrop.io/my/${COLLECTION_ID}/tag/%23${encodeURIComponent(tag)}"><span class="tag">#${tag}</span></a>` : ''}
-        </div>
-        <hr/>
-      </div>`;
+    const cover   = it.cover ? `<img class="preview" src="${it.cover}"/>` : '';
+    const preview = `https://app.raindrop.io/my/${COLLECTION_ID}/item/${it._id}/preview`;
+    const dom     = new URL(it.link).hostname.replace('www.','');
+    const icon    = `https://www.google.com/s2/favicons?domain=${dom}&sz=32`;
+    const date    = dayjs(it.created).format('MMM D');
+    const tag     = it.tags?.[0] || '';
+    const tagLink = tag
+      ? `<a href="https://app.raindrop.io/my/${COLLECTION_ID}/tag/%23${encodeURIComponent(tag)}" class="tag-link"><span class="tag">#${tag}</span></a>`
+      : '';
+
+    return `<div class="item">
+      ${cover}
+      <a class="title" href="${preview}">${it.title}</a>
+      ${it.excerpt ? `<div class="description">${it.excerpt}</div>` : ''}
+      <div class="meta">
+        <img class="icon" src="${icon}"/><a href="https://${dom}" style="color:inherit;text-decoration:none">${dom}</a>
+        <span>• Saved on ${date}</span>${tagLink}
+      </div>
+      <hr/>
+    </div>`;
   }).join('');
 
-  const recHtml = recs.length ? `
-    <h2 class="rec">Recommended for You</h2>
-    ${recs.map(r => {
-      const domain = new URL(r.url).hostname.replace('www.', '');
-      const icon = `https://www.google.com/s2/favicons?domain=${domain}&sz=32`;
-      return `
-        <div class="rec-item">
+  const recHtml = recs.length
+    ? `<h2 class="rec">Recommended for You</h2>` + recs.map(r => {
+        const dom = new URL(r.url).hostname.replace('www.','');
+        const ico = `https://www.google.com/s2/favicons?domain=${dom}&sz=32`;
+        return `<div class="rec-item">
           <a class="rec-link" href="${r.url}">${r.title}</a>
           <div class="meta">
-            <img class="icon" src="${icon}" alt="favicon"/>
-            <a href="https://${domain}" style="color:inherit;text-decoration:none">${domain}</a>
+            <img class="icon" src="${ico}"/><a href="https://${dom}" style="color:inherit;text-decoration:none">${dom}</a>
             <span>•</span>
-            <a class="tag-link" href="https://app.raindrop.io/my/${COLLECTION_ID}/tag/%23${encodeURIComponent(r.tag)}"><span class="tag">#${r.tag}</span></a>
+            <a href="https://app.raindrop.io/my/${COLLECTION_ID}/tag/%23${encodeURIComponent(r.tag)}" class="tag-link"><span class="tag">#${r.tag}</span></a>
           </div>
           <hr/>
         </div>`;
-    }).join('')}` : '';
+      }).join('')
+    : '';
 
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="color-scheme" content="light dark">
-  <meta name="supported-color-schemes" content="light dark">
-  ${styles}
-</head>
-<body>
-  <h1>Your Read Later Digest</h1>
-  ${mainHtml}
-  ${recHtml}
-</body>
-</html>`;
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="color-scheme" content="light dark"><meta name="supported-color-schemes" content="light dark">${styles}</head><body><h1>Your Read Later Digest</h1>${mainHtml}${recHtml}</body></html>`;
 }
 
-// Send email
+// Send via iCloud SMTP
 async function sendEmail(html) {
   const transporter = nodemailer.createTransport({
     host: 'smtp.mail.me.com',
@@ -145,7 +131,7 @@ async function sendEmail(html) {
   await transporter.verify(); console.log('✅ SMTP ok');
   await transporter.sendMail({
     from: FROM_EMAIL,
-    to: TO_EMAIL,
+    to:   TO_EMAIL,
     subject: `Your Read Later Digest — ${dayjs().format('MMM D, YYYY')}`,
     html
   });
@@ -155,7 +141,7 @@ async function sendEmail(html) {
 // Main
 (async () => {
   try {
-    console.log('🔑 CONFIG:', { COLLECTION_ID, ARCHIVE_ID, OPENAI_API_KEY: !!OPENAI_API_KEY });
+    console.log('🔑 CONFIG:', { COLLECTION_ID, ARCHIVE_ID, hasKey: !!OPENAI_API_KEY });
     const saved = await getRaindropItems(COLLECTION_ID);
     if (saved.length <= 5) { console.log('≤5 items, skipping'); return; }
     const latest = saved.slice(0, 7);
@@ -164,34 +150,13 @@ async function sendEmail(html) {
     if (ARCHIVE_ID && OPENAI_API_KEY) {
       console.log(`🔍 Fetching archive items from ${ARCHIVE_ID}…`);
       const archive = await getRaindropItems(ARCHIVE_ID, 100);
-      // build tag list
       const count = {};
-      archive.forEach(it => (it.tags||[]).forEach(t=>count[t]=(count[t]||0)+1));
-      const topTags = Object.entries(count)
-        .sort((a,b)=>b[1]-a[1]).slice(0,10).map(([t])=>t);
+      archive.forEach(it => (it.tags||[]).forEach(t => count[t] = (count[t]||0) + 1));
+      const topTags = Object.entries(count).sort((a,b) => b[1]-a[1]).slice(0,10).map(([t]) => t);
       console.log('🔝 Top archive tags:', topTags);
       recs = await getRecommendations(topTags, 5);
-    } else {
-      console.warn('⚠️ ARCHIVE_ID or OPENAI_API_KEY missing; skipping recommendations');
-    }
+    } else console.warn('⚠️ ARCHIVE_ID or OPENAI_API_KEY missing; skipping recs');
 
-    const html = buildEmailHtml(latest, recs);
-    await sendEmail(html);
-  } catch (e) {
-    console.error('❌', e);
-    process.exit(1);
-  }
-})();
-(async () => {
-  try {
-    const saved = await getRaindropItems(COLLECTION_ID);
-    if (saved.length <= 5) { console.log('<=5, skip'); return; }
-    const latest = saved.slice(0, 7);
-    let recs = [];
-    if (ARCHIVE_ID && NEWSAPI_KEY) {
-      const archive = await getRaindropItems(ARCHIVE_ID, 200);
-      recs = await getTagRecommendations(archive, 10, 2);
-    }
     const html = buildEmailHtml(latest, recs);
     await sendEmail(html);
   } catch (e) {
