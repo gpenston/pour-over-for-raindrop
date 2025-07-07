@@ -27,11 +27,10 @@ async function getRaindropItems(collectionId, perpage = 50) {
   return data.items;
 }
 
-// Tag-based recommendations
-async function getTagRecommendations(items, topTagCount = 200, perTag = 2) {
+// Tag-based recommendations with early exit to avoid rate-limit
+async function getTagRecommendations(items, topTagCount = 20, perTag = 2) {
   const tagCount = {};
   items.forEach(item => { (item.tags || []).forEach(tag => { tagCount[tag] = (tagCount[tag] || 0) + 1; }); });
-  console.log('All tag counts:', tagCount);
   const topTags = Object.entries(tagCount)
     .sort((a, b) => b[1] - a[1])
     .slice(0, topTagCount)
@@ -40,19 +39,22 @@ async function getTagRecommendations(items, topTagCount = 200, perTag = 2) {
 
   const recs = [];
   for (const tag of topTags) {
+    if (recs.length >= 5) break; // stop once we have enough
     try {
       console.log(`🌐 Searching NewsAPI for "${tag}"…`);
       const { data } = await axios.get('https://newsapi.org/v2/everything', {
         params: { q: tag, pageSize: perTag, apiKey: NEWSAPI_KEY }
       });
-      data.articles.forEach(a => recs.push({ title: a.title, url: a.url, tag }));
+      for (const a of data.articles) {
+        if (recs.length >= 5) break;
+        recs.push({ title: a.title, url: a.url, tag });
+      }
     } catch (e) {
       console.warn(`⚠️ NewsAPI failed for ${tag}: ${e.message}`);
     }
   }
-  const limited = recs.slice(0, 5);
-  console.log(`✅ Collected ${limited.length} recommendations.`);
-  return limited;
+  console.log(`✅ Collected ${recs.length} recommendations.`);
+  return recs;
 }
 
 // Build email HTML
@@ -79,7 +81,6 @@ function buildEmailHtml(items, recommendations = []) {
     a.tag-link { text-decoration:none; color:inherit; }
   </style>`;
 
-  // Saved items
   const mainHtml = items.map(item => {
     const cover = item.cover ? `<img class="preview" src="${item.cover}" alt="cover"/>` : '';
     const previewUrl = `https://app.raindrop.io/my/${COLLECTION_ID}/item/${item._id}/preview`;
@@ -102,7 +103,6 @@ function buildEmailHtml(items, recommendations = []) {
       </div>`;
   }).join('');
 
-  // Recommendations
   const recHtml = recommendations.length
     ? `<h2 class="rec">Recommended for You</h2>` + recommendations.map(r => {
         const dom = new URL(r.url).hostname.replace('www.', '');
@@ -140,7 +140,7 @@ async function sendEmail(html) {
     let recs = [];
     if (ARCHIVE_ID && NEWSAPI_KEY) {
       const archive = await getRaindropItems(ARCHIVE_ID, 200);
-      recs = await getTagRecommendations(archive, 200, 2);
+      recs = await getTagRecommendations(archive, 20, 2);
     } else console.warn('⚠️ ARCHIVE_ID or NEWSAPI_KEY missing; skipping recs');
     const html = buildEmailHtml(latest, recs);
     await sendEmail(html);
