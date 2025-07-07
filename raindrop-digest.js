@@ -20,12 +20,14 @@ const TO_EMAIL         = process.env.TO_EMAIL;
 async function getRaindropItems(collectionId, perpage = 50) {
   console.log(`🔍 Fetching items from collection ${collectionId}…`);
   const url = `https://api.raindrop.io/rest/v1/raindrops/${collectionId}?perpage=${perpage}&sort=-created`;
-  const { data } = await axios.get(url, { headers: { Authorization: `Bearer ${RAINDROP_TOKEN}` } });
+  const { data } = await axios.get(url, {
+    headers: { Authorization: `Bearer ${RAINDROP_TOKEN}` }
+  });
   console.log(`🔢 Fetched ${data.items.length} items.`);
   return data.items;
 }
 
-// Tag-based recommendations via NewsAPI, include source tag
+// Tag-based recommendations via NewsAPI
 async function getTagRecommendations(items, topTagCount = 10, perTag = 2) {
   const tagCount = {};
   items.forEach(item => { (item.tags||[]).forEach(tag => { tagCount[tag] = (tagCount[tag]||0)+1; }); });
@@ -37,7 +39,9 @@ async function getTagRecommendations(items, topTagCount = 10, perTag = 2) {
   for (const tag of topTags) {
     try {
       console.log(`🌐 Searching NewsAPI for "${tag}"…`);
-      const { data } = await axios.get('https://newsapi.org/v2/everything', { params: { q: tag, pageSize: perTag, apiKey: NEWSAPI_KEY } });
+      const { data } = await axios.get('https://newsapi.org/v2/everything', {
+        params: { q: tag, pageSize: perTag, apiKey: NEWSAPI_KEY }
+      });
       data.articles.forEach(a => recs.push({ title: a.title, url: a.url, tag }));
     } catch (e) {
       console.warn(`⚠️ NewsAPI failed for ${tag}: ${e.message}`);
@@ -48,7 +52,7 @@ async function getTagRecommendations(items, topTagCount = 10, perTag = 2) {
   return limited;
 }
 
-// Build email HTML with images, source, tags, and Add button
+// Build email HTML with manual deep-link add button
 function buildEmailHtml(items, recommendations=[]) {
   const font = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
   const linkColor = '#4ba3fa';
@@ -62,17 +66,17 @@ function buildEmailHtml(items, recommendations=[]) {
     .title,.rec-link{font-size:1.25rem;font-weight:600;margin:0 0 .5rem;color:${linkColor};text-decoration:none}
     .description{font-size:.95rem;line-height:1.5;margin-bottom:.75rem;color:inherit}
     .meta{font-size:.85rem;color:#555;display:flex;align-items:center;gap:.5rem;margin-bottom:1rem}
-    .tag{background:#eee;border-radius:3px;padding:2px 6px;font-size:.75rem;color:#555}
+    .tag{background:#eee;border-radius:3px;padding:2px 6px;font-size:.75rem;color:#555;margin-right:0.5rem}
     .add-btn{display:inline-block;padding:6px 12px;margin-top:4px;font-size:.85rem;border:1px solid ${linkColor};border-radius:4px;color:${linkColor};text-decoration:none}
     hr{border:none;border-top:1px solid #ccc;margin:2rem 0}
   </style>`;
 
   const mainHtml = items.map(item=>{
-    const cover = item.cover?`<img class="preview" src="${item.cover}" alt="cover"/>`:'';
-    const previewUrl = `https://app.raindrop.io/my/${COLLECTION_ID}/item/${item._id}/preview`;
-    const domain = new URL(item.link).hostname.replace('www.','');
-    const favicon = `https://www.google.com/s2/favicons?domain=${domain}&sz=32`;
-    const date = dayjs(item.created).format('MMM D');
+    const cover=item.cover?`<img class="preview" src="${item.cover}" alt="cover"/>`:'';
+    const previewUrl=`https://app.raindrop.io/my/${COLLECTION_ID}/item/${item._id}/preview`;
+    const domain=new URL(item.link).hostname.replace('www.','');
+    const favicon=`https://www.google.com/s2/favicons?domain=${domain}&sz=32`;
+    const date=dayjs(item.created).format('MMM D');
     return `
       <div class="item">
         ${cover}
@@ -88,7 +92,8 @@ function buildEmailHtml(items, recommendations=[]) {
   const recHtml = recommendations.length?`<h2 class="rec">Recommended for You</h2>`+recommendations.map(r=>{
     const dom=new URL(r.url).hostname.replace('www.','');
     const fav=`https://www.google.com/s2/favicons?domain=${dom}&sz=32`;
-    const addLink=`https://app.raindrop.io/my/${COLLECTION_ID}/add?url=${encodeURIComponent(r.url)}`;
+    // Deep link for manual add
+    const deepLink = `raindrop://x-callback-url/add?url=${encodeURIComponent(r.url)}&title=${encodeURIComponent(r.title)}&collectionId=${COLLECTION_ID}`;
     return `
       <div class="rec-item">
         <a class="rec-link" href="${r.url}">${r.title}</a>
@@ -96,7 +101,7 @@ function buildEmailHtml(items, recommendations=[]) {
           <span class="tag">#${r.tag}</span>
           <img class="icon" src="${fav}" alt="favicon"/><a href="https://${dom}" style="color:inherit;text-decoration:none">${dom}</a>
         </div>
-        <a class="add-btn" href="${addLink}">Add to Read Later</a>
+        <a class="add-btn" href="${deepLink}">Add to Read Later</a>
         <hr/>
       </div>`;
   }).join(''):'';
@@ -107,8 +112,7 @@ function buildEmailHtml(items, recommendations=[]) {
 // Send via iCloud SMTP
 async function sendEmail(html){
   const transporter=nodemailer.createTransport({host:'smtp.mail.me.com',port:587,secure:false,auth:{user:SMTP_USER,pass:SMTP_PASS}});
-  await transporter.verify();
-  console.log('✅ SMTP verified');
+  await transporter.verify(); console.log('✅ SMTP verified');
   await transporter.sendMail({from:FROM_EMAIL,to:TO_EMAIL,subject:`Your Read Later Digest — ${dayjs().format('MMM D, YYYY')}`,html});
   console.log('📧 Sent!');
 }
