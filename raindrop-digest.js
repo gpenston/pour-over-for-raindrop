@@ -8,14 +8,15 @@ import dayjs from 'dayjs';
 
 // Config
 const COLLECTION_ID = process.env.COLLECTION_ID;
+const ARCHIVE_ID    = process.env.ARCHIVE_ID;
 const RAINDROP_TOKEN = process.env.RAINDROP_TOKEN;
-const NEWSAPI_KEY = process.env.NEWSAPI_KEY;
-const SMTP_USER = process.env.SMTP_USER;
-const SMTP_PASS = process.env.SMTP_PASS;
-const FROM_EMAIL = process.env.FROM_EMAIL;
-const TO_EMAIL = process.env.TO_EMAIL;
+const NEWSAPI_KEY   = process.env.NEWSAPI_KEY;
+const SMTP_USER     = process.env.SMTP_USER;
+const SMTP_PASS     = process.env.SMTP_PASS;
+const FROM_EMAIL    = process.env.FROM_EMAIL;
+const TO_EMAIL      = process.env.TO_EMAIL;
 
-// Fetch items from Raindrop
+// Fetch items from a Raindrop collection
 async function getRaindropItems(collectionId, perpage = 50) {
   console.log(`🔍 Fetching items from collection ${collectionId}…`);
   const url = `https://api.raindrop.io/rest/v1/raindrops/${collectionId}?perpage=${perpage}&sort=-created`;
@@ -27,19 +28,24 @@ async function getRaindropItems(collectionId, perpage = 50) {
 }
 
 // Tag-based recommendations via NewsAPI
-async function getTagRecommendations(items, topTagCount = 3, perTag = 2) {
+async function getTagRecommendations(items, topTagCount = 10, perTag = 2) {
+  // Count tags across items
   const tagCount = {};
   items.forEach(item => {
     (item.tags || []).forEach(tag => {
       tagCount[tag] = (tagCount[tag] || 0) + 1;
     });
   });
+  console.log('All tag counts:', tagCount);
+
+  // Pick top tags
   const topTags = Object.entries(tagCount)
     .sort((a, b) => b[1] - a[1])
     .slice(0, topTagCount)
     .map(([tag]) => tag);
   console.log(`🔝 Top tags: ${topTags.join(', ')}`);
 
+  // Fetch articles for each tag
   const recs = [];
   for (const tag of topTags) {
     try {
@@ -52,9 +58,10 @@ async function getTagRecommendations(items, topTagCount = 3, perTag = 2) {
       console.warn(`⚠️ NewsAPI failed for ${tag}: ${e.message}`);
     }
   }
-  console.log(`✅ Collected ${recs.length} recommendations.`);
-  // Limit to 5 total
-  return recs.slice(0, 5);
+  // Limit total recommendations
+  const limited = recs.slice(0, 5);
+  console.log(`✅ Collected ${limited.length} recommendations.`);
+  return limited;
 }
 
 // Build email HTML
@@ -63,17 +70,13 @@ function buildEmailHtml(items, recommendations = []) {
   const linkColor = '#4ba3fa';
   const styles = `<style>
     body { font-family: ${font}; margin:0; padding:32px; background:#fff; color:#000; }
-    @media (prefers-color-scheme: dark) {
-      body { background:#1c1c1e; color:#f2f2f7; }
-      a { color:${linkColor}!important; }
-      hr { border-color:#333; }
-    }
+    @media (prefers-color-scheme: dark) { body { background:#1c1c1e; color:#f2f2f7; } a { color:${linkColor}!important; } hr { border-color:#333; } }
     h1 { font-family:'New York',Georgia,serif; font-size:2rem; margin-bottom:1.5rem; }
     h2.rec { font-family:'New York',Georgia,serif; font-size:1.5rem; margin-top:2rem; }
     .item, .rec-item { margin-bottom:2rem; }
     img.preview { width:100%; border-radius:12px; margin-bottom:1rem; }
     .title, .rec-link { font-size:1.25rem; font-weight:600; margin:0 0 .5rem; color:${linkColor}; text-decoration:none; }
-    .description { font-size:.95rem; line-height:1.5; margin-bottom:.75rem; color:inherit; }
+    .description { font-size:.95rem; line-height:1.5; margin-bottom:.75rem; }
     .meta { font-size:.85rem; color:#555; display:flex; align-items:center; gap:.5rem; margin-bottom:1rem; }
     img.icon { width:16px; height:16px; vertical-align:text-bottom; }
     hr { border:none; border-top:1px solid #ccc; margin:2rem 0; }
@@ -100,8 +103,7 @@ function buildEmailHtml(items, recommendations = []) {
   }).join('');
 
   const recHtml = recommendations.length
-    ? `<h2 class="rec">Recommended for You</h2>` +
-      recommendations.map(r => {
+    ? `<h2 class="rec">Recommended for You</h2>` + recommendations.map(r => {
         const dom = new URL(r.url).hostname.replace('www.', '');
         const fav = `https://www.google.com/s2/favicons?domain=${dom}&sz=32`;
         return `
@@ -122,26 +124,27 @@ function buildEmailHtml(items, recommendations = []) {
 async function sendEmail(html) {
   const transporter = nodemailer.createTransport({host:'smtp.mail.me.com',port:587,secure:false,auth:{user:SMTP_USER,pass:SMTP_PASS}});
   await transporter.verify(); console.log('✅ SMTP verified');
-  const info = await transporter.sendMail({from:FROM_EMAIL,to:TO_EMAIL,subject:`Your Read Later Digest — ${dayjs().format('MMM D, YYYY')}`,html});
-  console.log('📧 Sent:', info.messageId);
+  await transporter.sendMail({from:FROM_EMAIL,to:TO_EMAIL,subject:`Your Read Later Digest — ${dayjs().format('MMM D, YYYY')}`,html});
+  console.log('📧 Sent!');
 }
 
-// Main flow
-(async () => {
-  try {
+// Main
+(async()=>{
+  try{
     const saved = await getRaindropItems(COLLECTION_ID);
-    if (saved.length <= 5) { console.log('<=5 items, skipping'); return; }
-    const latest = saved.slice(0, 7);
+    if(saved.length<=5){console.log('<=5 items, skipping');return}
+    const latest = saved.slice(0,7);
 
     let recs = [];
-    if (NEWSAPI_KEY) recs = await getTagRecommendations(latest);
-    else console.warn('⚠️ NEWSAPI_KEY not set; skipping recs.');
+    if(ARCHIVE_ID && NEWSAPI_KEY){
+      const archive = await getRaindropItems(ARCHIVE_ID,100);
+      recs = await getTagRecommendations(archive,10,2);
+    } else{
+      console.warn('⚠️ ARCHIVE_ID or NEWSAPI_KEY missing; skipping recs');
+    }
 
-    const html = buildEmailHtml(latest, recs);
+    const html = buildEmailHtml(latest,recs);
     await sendEmail(html);
     console.log('✅ Digest sent!');
-  } catch (e) {
-    console.error('❌ Error:', e);
-    process.exit(1);
-  }
+  }catch(e){console.error('❌ Error:',e);process.exit(1)}
 })();
