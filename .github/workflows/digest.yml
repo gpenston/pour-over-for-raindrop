@@ -25,3 +25,5 @@ jobs:
           SMTP_PASS:      ${{ secrets.SMTP_PASS }}
           FROM_EMAIL:     ${{ secrets.FROM_EMAIL }}
           TO_EMAIL:       ${{ secrets.TO_EMAIL }}
+          ARCHIVE_ID:      ${{ secrets.ARCHIVE_ID }}
+          OPENAI_API_KEY:  ${{ secrets.OPENAI_API_KEY }}
