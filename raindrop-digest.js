@@ -28,7 +28,7 @@ async function getRaindropItems(collectionId, perpage = 50) {
 }
 
 // Tag-based recommendations via NewsAPI
-async function getTagRecommendations(items, topTagCount = 10, perTag = 2) {
+async function getTagRecommendations(items, topTagCount = 200, perTag = 2) {
   const tagCount = {};
   items.forEach(item => { (item.tags || []).forEach(tag => { tagCount[tag] = (tagCount[tag] || 0) + 1; }); });
   console.log('All tag counts:', tagCount);
@@ -36,7 +36,7 @@ async function getTagRecommendations(items, topTagCount = 10, perTag = 2) {
     .sort((a, b) => b[1] - a[1])
     .slice(0, topTagCount)
     .map(([tag]) => tag);
-  console.log(`🔝 Top tags: ${topTags.join(', ')}`);
+  console.log(`🔝 Top tags (${topTagCount}): ${topTags.join(', ')}`);
 
   const recs = [];
   for (const tag of topTags) {
@@ -71,14 +71,13 @@ function buildEmailHtml(items, recommendations = []) {
     .item, .rec-item { margin-bottom:2rem; }
     img.preview { width:100%; border-radius:12px; margin-bottom:1rem; }
     .title, .rec-link { font-size:1.25rem; font-weight:600; margin:0 0 .5rem; color:${linkColor}; text-decoration:none; }
-    .description { font-size:.95rem; line-height:1.5; margin-bottom:.75rem; color:inherit; }
+    .description { font-size:.95rem; line-height:1.5; margin-bottom:.75rem; }
     .meta { font-size:.85rem; color:#555; display:flex; align-items:center; gap:.5rem; margin-bottom:1rem; }
-    .tag { background:#eee; border-radius:3px; padding:2px 6px; font-size:.75rem; color:#555; }
+    .tag { background:#eee; border-radius:3px; padding:2px 6px; font-size:.75rem; color:#555; margin-left:auto; }
     img.icon { width:12px; height:12px; vertical-align:text-bottom; }
     hr { border:none; border-top:1px solid #ccc; margin:2rem 0; }
   </style>`;
 
-  // Main saved items
   const mainHtml = items.map(item => {
     const cover = item.cover ? `<img class="preview" src="${item.cover}" alt="cover"/>` : '';
     const previewUrl = `https://app.raindrop.io/my/${COLLECTION_ID}/item/${item._id}/preview`;
@@ -99,7 +98,6 @@ function buildEmailHtml(items, recommendations = []) {
       </div>`;
   }).join('');
 
-  // Recommendations with domain then tag
   const recHtml = recommendations.length
     ? `<h2 class="rec">Recommended for You</h2>` + recommendations.map(r => {
         const dom = new URL(r.url).hostname.replace('www.', '');
@@ -110,7 +108,7 @@ function buildEmailHtml(items, recommendations = []) {
             <div class="meta">
               <img class="icon" src="${fav}" alt="favicon"/>
               <a href="https://${dom}" style="color:inherit;text-decoration:none">${dom}</a>
-              <span> #${r.tag}</span>
+              <span class="tag">#${r.tag}</span>
             </div>
             <hr/>
           </div>`;
@@ -128,7 +126,6 @@ async function sendEmail(html) {
   console.log('📧 Sent!');
 }
 
-// Main
 (async () => {
   try {
     const saved = await getRaindropItems(COLLECTION_ID);
@@ -137,8 +134,8 @@ async function sendEmail(html) {
 
     let recs = [];
     if (ARCHIVE_ID && NEWSAPI_KEY) {
-      const archive = await getRaindropItems(ARCHIVE_ID, 100);
-      recs = await getTagRecommendations(archive, 10, 2);
+      const archive = await getRaindropItems(ARCHIVE_ID, 200);
+      recs = await getTagRecommendations(archive, 200, 2);
     } else console.warn('⚠️ ARCHIVE_ID or NEWSAPI_KEY missing; skipping recs');
 
     const html = buildEmailHtml(latest, recs);
