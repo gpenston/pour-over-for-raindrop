@@ -27,35 +27,33 @@ async function getRaindropItems(collectionId, perpage = 50) {
   return data.items;
 }
 
-// Ask OpenAI for recommendations
+// Ask OpenAI for recommendations, fallback on error
 async function getRecommendations(tags, count = 5) {
   console.log(`💡 Generating ${count} recs for tags: ${tags.join(', ')}`);
   const prompt = `Here are my top tags: ${tags.join(', ')}. ` +
                  `Suggest ${count} recent, high-quality articles not already in my Read Later list. ` +
-                 `Respond with a JSON array of objects having "title" and "url" fields.`;
-
-  const res = await axios.post(
-    'https://api.openai.com/v1/chat/completions',
-    {
-      model: 'gpt-4o-mini',
-      messages: [
-        { role: 'system', content: 'You are a helpful recommendation engine.' },
-        { role: 'user',   content: prompt }
-      ],
-      temperature: 0.7,
-      max_tokens: 500
-    },
-    { headers: { Authorization: `Bearer ${OPENAI_API_KEY}` } }
-  );
-
-  const text = res.data.choices[0].message.content.trim();
+                 `Respond with a JSON array of objects having \"title\" and \"url\" fields.`;
   try {
+    const res = await axios.post(
+      'https://api.openai.com/v1/chat/completions',
+      {
+        model: 'gpt-3.5-turbo',
+        messages: [
+          { role: 'system', content: 'You are a helpful recommendation engine.' },
+          { role: 'user',   content: prompt }
+        ],
+        temperature: 0.7,
+        max_tokens: 500
+      },
+      { headers: { Authorization: `Bearer ${OPENAI_API_KEY}` } }
+    );
+    const text = res.data.choices[0].message.content.trim();
     const recs = JSON.parse(text);
     console.log(`✅ Parsed ${recs.length} recs from OpenAI.`);
     return recs;
   } catch (e) {
-    console.warn('⚠️ Failed to parse JSON from OpenAI response.');
-    return [];
+    console.warn(`⚠️ OpenAI recs failed: ${e.response?.status || e.message}`);
+    return [];  // fallback to empty recs
   }
 }
 
@@ -81,8 +79,8 @@ function buildEmailHtml(items, recs = []) {
   const mainHtml = items.map(it => {
     const cover   = it.cover ? `<img class="preview" src="${it.cover}"/>` : '';
     const preview = `https://app.raindrop.io/my/${COLLECTION_ID}/item/${it._id}/preview`;
-    const dom     = new URL(it.link).hostname.replace('www.','');
-    const icon    = `https://www.google.com/s2/favicons?domain=${dom}&sz=32`;
+    const domain  = new URL(it.link).hostname.replace('www.','');
+    const icon    = `https://www.google.com/s2/favicons?domain=${domain}&sz=32`;
     const date    = dayjs(it.created).format('MMM D');
     const tag     = it.tags?.[0] || '';
     const tagLink = tag
@@ -94,7 +92,7 @@ function buildEmailHtml(items, recs = []) {
       <a class="title" href="${preview}">${it.title}</a>
       ${it.excerpt ? `<div class="description">${it.excerpt}</div>` : ''}
       <div class="meta">
-        <img class="icon" src="${icon}"/><a href="https://${dom}" style="color:inherit;text-decoration:none">${dom}</a>
+        <img class="icon" src="${icon}"/><a href="https://${domain}" style="color:inherit;text-decoration:none">${domain}</a>
         <span>• Saved on ${date}</span>${tagLink}
       </div>
       <hr/>
@@ -103,14 +101,17 @@ function buildEmailHtml(items, recs = []) {
 
   const recHtml = recs.length
     ? `<h2 class="rec">Recommended for You</h2>` + recs.map(r => {
-        const dom = new URL(r.url).hostname.replace('www.','');
-        const ico = `https://www.google.com/s2/favicons?domain=${dom}&sz=32`;
+        const domain = new URL(r.url).hostname.replace('www.','');
+        const icon2  = `https://www.google.com/s2/favicons?domain=${domain}&sz=32`;
+        const tag2   = r.tag || '';
+        const tagLink2 = tag2
+          ? `<a href="https://app.raindrop.io/my/${COLLECTION_ID}/tag/%23${encodeURIComponent(tag2)}" class="tag-link"><span class="tag">#${tag2}</span></a>`
+          : '';
         return `<div class="rec-item">
           <a class="rec-link" href="${r.url}">${r.title}</a>
           <div class="meta">
-            <img class="icon" src="${ico}"/><a href="https://${dom}" style="color:inherit;text-decoration:none">${dom}</a>
-            <span>•</span>
-            <a href="https://app.raindrop.io/my/${COLLECTION_ID}/tag/%23${encodeURIComponent(r.tag)}" class="tag-link"><span class="tag">#${r.tag}</span></a>
+            <img class="icon" src="${icon2}"/><a href="https://${domain}" style="color:inherit;text-decoration:none">${domain}</a>
+            <span>•</span>${tagLink2}
           </div>
           <hr/>
         </div>`;
