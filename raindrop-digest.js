@@ -27,41 +27,66 @@ async function getRaindropItems(collectionId, perpage = 50) {
   return data.items;
 }
 
+// Helper to pause
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 // Generate recommendations via OpenAI based on archive history
 async function getRecommendations(archiveItems, count = 3) {
+  // Use a smaller sample to reduce token usage
   const sample = archiveItems
-    .slice(0, 10)
-    .map((i) => `- ${i.title}`)
+    .slice(0, 5)
+    .map(i => `- ${i.title}`)
     .join('\n');
-
   const prompt = `You are a helpful recommendation engine. Based on these previously read articles:\n${sample}\n\nSuggest ${count} recent, high-quality articles (title and URL only).`;
 
-  const resp = await axios.post(
-    'https://api.openai.com/v1/chat/completions',
-    {
-      model: 'gpt-4o-mini',
-      messages: [
-        { role: 'system', content: 'You recommend content.' },
-        { role: 'user', content: prompt }
-      ],
-      temperature: 0.7,
-    },
-    { headers: { Authorization: `Bearer ${OPENAI_API_KEY}` } }
-  );
+  // Function to call OpenAI
+  async function callOpenAI() {
+    return axios.post(
+      'https://api.openai.com/v1/chat/completions',
+      {
+        model: 'gpt-3.5-turbo',
+        messages: [
+          { role: 'system', content: 'You recommend content.' },
+          { role: 'user', content: prompt }
+        ],
+        temperature: 0.7,
+      },
+      { headers: { Authorization: `Bearer ${OPENAI_API_KEY}` } }
+    );
+  }
 
-  const text = resp.data.choices[0].message.content;
   try {
-    const list = JSON.parse(text);
-    return list.slice(0, count);
-  } catch {
-    return text.split('\n')
-      .filter(Boolean)
-      .slice(0, count)
-      .map((line) => {
-        const match = line.match(/^(.*)\s+(https?:\/\/\S+)/);
-        return match ? { title: match[1].trim(), url: match[2] } : null;
-      })
-      .filter(Boolean);
+    let resp;
+    try {
+      resp = await callOpenAI();
+    } catch (err) {
+      if (err.response?.status === 429) {
+        console.warn('⚠️ Rate limited by OpenAI, retrying in 3s...');
+        await sleep(3000);
+        resp = await callOpenAI();
+      } else {
+        throw err;
+      }
+    }
+    const text = resp.data.choices[0].message.content;
+    try {
+      const list = JSON.parse(text);
+      return list.slice(0, count);
+    } catch {
+      return text.split('\n')
+        .filter(Boolean)
+        .slice(0, count)
+        .map(line => {
+          const match = line.match(/^(.*)\s+(https?:\/\/\S+)/);
+          return match ? { title: match[1].trim(), url: match[2] } : null;
+        })
+        .filter(Boolean);
+    }
+  } catch (err) {
+    console.error('❌ Error in getRecommendations:', err.message);
+    return [];
   }
 }
 
@@ -89,7 +114,7 @@ function buildEmailHtml(items, recommendations = []) {
   </style>`;
 
   const mainHtml = items
-    .map((item) => {
+    .map(item => {
       const preview = `https://app.raindrop.io/my/${COLLECTION_ID}/item/${item._id}/preview`;
       const domain = new URL(item.link).hostname.replace('www.', '');
       const savedDate = dayjs(item.created).format('MMM D');
@@ -108,15 +133,14 @@ function buildEmailHtml(items, recommendations = []) {
     .join('');
 
   const recSection = recommendations.length
-    ? `<h2 class="rec">Recommended for You</h2>` +
-        recommendations
-          .map(
-            (rec) => `
+    ? `<h2 class="rec">Recommended for You</h2>${recommendations
+        .map(
+          rec => `
       <div class="rec-item">
         <a class="rec-link" href="${rec.url}">${rec.title}</a>
       </div>`
-          )
-          .join('')
+        )
+        .join('')}`
     : '';
 
   return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="color-scheme" content="light dark"><meta name="supported-color-schemes" content="light dark">${styles}</head><body><h1>Your Read Later Digest</h1>${mainHtml}${recSection}</body></html>`;
@@ -141,7 +165,7 @@ async function sendEmail(html) {
   console.log('📧 Sent:', info.messageId);
 }
 
-// Main flow with robust recommendation error handling
+// Main flow with robust recommendation handling
 (async () => {
   try {
     console.log(`🔑 ARCHIVE_ID: ${ARCHIVE_ID}`);
@@ -155,13 +179,12 @@ async function sendEmail(html) {
     let recs = [];
     if (ARCHIVE_ID) {
       try {
-        console.log('🔍 Fetching archive items for recommendations…');
+        console.log('🔍 Fetching archive items...');
         const archiveItems = await getRaindropItems(ARCHIVE_ID, 20);
         console.log(`🔢 Fetched ${archiveItems.length} archive items.`);
         recs = await getRecommendations(archiveItems, 3);
       } catch (err) {
         console.warn('⚠️ Recommendation step failed, sending without recs:', err.message);
-        recs = [];
       }
     } else {
       console.warn('⚠️ ARCHIVE_ID not set; skipping recommendations.');
