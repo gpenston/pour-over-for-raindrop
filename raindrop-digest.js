@@ -72,36 +72,37 @@ function buildEmailHtml(items, recommendations = []) {
     img.preview { width:100%; border-radius:12px; margin-bottom:1rem; }
     .title, .rec-link { font-size:1.25rem; font-weight:600; margin:0 0 .5rem; color:${linkColor}; text-decoration:none; }
     .description { font-size:.95rem; line-height:1.5; margin-bottom:.75rem; }
-    .meta { font-size:.85rem; color:#555; display:flex; align-items:center; gap:.5rem; margin-bottom:1rem; flex-wrap:wrap; }
+    .meta { font-size:.85rem; color:#555; display:flex; align-items:center; gap:.5rem; margin-bottom:1rem; }
     .tag { background:#eee; border-radius:3px; padding:2px 6px; font-size:.75rem; color:#555; }
     img.icon { width:12px; height:12px; vertical-align:text-bottom; }
     hr { border:none; border-top:1px solid #ccc; margin:2rem 0; }
-    a.tag-link { text-decoration:none; color:#555; }
+    a.tag-link { text-decoration:none; color:inherit; }
   </style>`;
 
-  // Main saved items
+  // Saved items
   const mainHtml = items.map(item => {
     const cover = item.cover ? `<img class="preview" src="${item.cover}" alt="cover"/>` : '';
     const previewUrl = `https://app.raindrop.io/my/${COLLECTION_ID}/item/${item._id}/preview`;
     const domain = new URL(item.link).hostname.replace('www.', '');
     const favicon = `https://www.google.com/s2/favicons?domain=${domain}&sz=32`;
     const date = dayjs(item.created).format('MMM D');
+    const tag = item.tags?.[0] || '';
     return `
       <div class="item">
         ${cover}
         <a class="title" href="${previewUrl}">${item.title}</a>
         ${item.excerpt ? `<div class="description">${item.excerpt}</div>` : ''}
         <div class="meta">
-          <a class="tag-link" href="https://app.raindrop.io/my/${COLLECTION_ID}/tag/${encodeURIComponent(item.tags?.[0]||'')}"><span class="tag">#${item.tags?.[0]||''}</span></a>
           <img class="icon" src="${favicon}" alt="favicon"/>
           <a href="https://${domain}" style="color:inherit;text-decoration:none">${domain}</a>
           <span>• Saved on ${date}</span>
+          ${tag ? `<a class="tag-link" href="https://app.raindrop.io/my/${COLLECTION_ID}/tag/%23${encodeURIComponent(tag)}"><span class="tag">#${tag}</span></a>` : ''}
         </div>
         <hr/>
       </div>`;
   }).join('');
 
-  // Recommendations: tag left, then domain
+  // Recommendations
   const recHtml = recommendations.length
     ? `<h2 class="rec">Recommended for You</h2>` + recommendations.map(r => {
         const dom = new URL(r.url).hostname.replace('www.', '');
@@ -110,9 +111,10 @@ function buildEmailHtml(items, recommendations = []) {
           <div class="rec-item">
             <a class="rec-link" href="${r.url}">${r.title}</a>
             <div class="meta">
-              <a class="tag-link" href="https://app.raindrop.io/my/${COLLECTION_ID}/tag/${encodeURIComponent(r.tag)}"><span class="tag">#${r.tag}</span></a>
               <img class="icon" src="${fav}" alt="favicon"/>
               <a href="https://${dom}" style="color:inherit;text-decoration:none">${dom}</a>
+              <span>•</span>
+              <a class="tag-link" href="https://app.raindrop.io/my/${COLLECTION_ID}/tag/%23${encodeURIComponent(r.tag)}"><span class="tag">#${r.tag}</span></a>
             </div>
             <hr/>
           </div>`;
@@ -122,7 +124,7 @@ function buildEmailHtml(items, recommendations = []) {
   return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="color-scheme" content="light dark"><meta name="supported-color-schemes" content="light dark">${styles}</head><body><h1>Your Read Later Digest</h1>${mainHtml}${recHtml}</body></html>`;
 }
 
-// Send via iCloud SMTP
+// Send email
 async function sendEmail(html) {
   const transporter = nodemailer.createTransport({ host: 'smtp.mail.me.com', port: 587, secure: false, auth: { user: SMTP_USER, pass: SMTP_PASS } });
   await transporter.verify(); console.log('✅ SMTP verified');
@@ -135,13 +137,11 @@ async function sendEmail(html) {
     const saved = await getRaindropItems(COLLECTION_ID);
     if (saved.length <= 5) { console.log('<=5 items, skipping'); return; }
     const latest = saved.slice(0, 7);
-
     let recs = [];
     if (ARCHIVE_ID && NEWSAPI_KEY) {
       const archive = await getRaindropItems(ARCHIVE_ID, 200);
       recs = await getTagRecommendations(archive, 200, 2);
     } else console.warn('⚠️ ARCHIVE_ID or NEWSAPI_KEY missing; skipping recs');
-
     const html = buildEmailHtml(latest, recs);
     await sendEmail(html);
     console.log('✅ Digest sent!');
