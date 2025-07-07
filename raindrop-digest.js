@@ -6,14 +6,15 @@ import axios from 'axios';
 import nodemailer from 'nodemailer';
 import dayjs from 'dayjs';
 
-const COLLECTION_ID = process.env.COLLECTION_ID;
-const ARCHIVE_ID = process.env.ARCHIVE_ID;
-const RAINDROP_TOKEN = process.env.RAINDROP_TOKEN;
-const SMTP_USER = process.env.SMTP_USER;
-const SMTP_PASS = process.env.SMTP_PASS;
-const FROM_EMAIL = process.env.FROM_EMAIL;
-const TO_EMAIL = process.env.TO_EMAIL;
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+// Environment variables
+const COLLECTION_ID     = process.env.COLLECTION_ID;
+const ARCHIVE_ID        = process.env.ARCHIVE_ID;
+const RAINDROP_TOKEN    = process.env.RAINDROP_TOKEN;
+const SMTP_USER         = process.env.SMTP_USER;
+const SMTP_PASS         = process.env.SMTP_PASS;
+const FROM_EMAIL        = process.env.FROM_EMAIL;
+const TO_EMAIL          = process.env.TO_EMAIL;
+const OPENAI_API_KEY    = process.env.OPENAI_API_KEY;
 
 // Fetch items from a Raindrop collection
 async function getRaindropItems(collectionId, perpage = 50) {
@@ -28,7 +29,11 @@ async function getRaindropItems(collectionId, perpage = 50) {
 
 // Generate recommendations via OpenAI based on archive history
 async function getRecommendations(archiveItems, count = 3) {
-  const sample = archiveItems.slice(0, 10).map(i => `- ${i.title}`).join('\n');
+  const sample = archiveItems
+    .slice(0, 10)
+    .map((i) => `- ${i.title}`)
+    .join('\n');
+
   const prompt = `You are a helpful recommendation engine. Based on these previously read articles:\n${sample}\n\nSuggest ${count} recent, high-quality articles (title and URL only).`;
 
   const resp = await axios.post(
@@ -49,10 +54,14 @@ async function getRecommendations(archiveItems, count = 3) {
     const list = JSON.parse(text);
     return list.slice(0, count);
   } catch {
-    return text.split('\n').filter(Boolean).slice(0, count).map(line => {
-      const match = line.match(/^(.*)\s+(https?:\/\/\S+)/);
-      return match ? { title: match[1].trim(), url: match[2] } : null;
-    }).filter(Boolean);
+    return text.split('\n')
+      .filter(Boolean)
+      .slice(0, count)
+      .map((line) => {
+        const match = line.match(/^(.*)\s+(https?:\/\/\S+)/);
+        return match ? { title: match[1].trim(), url: match[2] } : null;
+      })
+      .filter(Boolean);
   }
 }
 
@@ -79,12 +88,13 @@ function buildEmailHtml(items, recommendations = []) {
     hr { border: none; border-top: 1px solid #ccc; margin: 2rem 0; }
   </style>`;
 
-  const mainHtml = items.map(item => {
-    const preview = `https://app.raindrop.io/my/${COLLECTION_ID}/item/${item._id}/preview`;
-    const domain = new URL(item.link).hostname.replace('www.', '');
-    const savedDate = dayjs(item.created).format('MMM D');
-    const favicon = `https://www.google.com/s2/favicons?domain=${domain}&sz=32`;
-    return `
+  const mainHtml = items
+    .map((item) => {
+      const preview = `https://app.raindrop.io/my/${COLLECTION_ID}/item/${item._id}/preview`;
+      const domain = new URL(item.link).hostname.replace('www.', '');
+      const savedDate = dayjs(item.created).format('MMM D');
+      const favicon = `https://www.google.com/s2/favicons?domain=${domain}&sz=32`;
+      return `
       <div class="item">
         ${item.cover ? `<img class="preview" src="${item.cover}"/>` : ''}
         <a class="title" href="${preview}">${item.title}</a>
@@ -94,13 +104,19 @@ function buildEmailHtml(items, recommendations = []) {
         </div>
         <hr/>
       </div>`;
-  }).join('');
+    })
+    .join('');
 
   const recSection = recommendations.length
-    ? `<h2 class="rec">Recommended for You</h2>` + recommendations.map(rec => `
+    ? `<h2 class="rec">Recommended for You</h2>` +
+        recommendations
+          .map(
+            (rec) => `
       <div class="rec-item">
         <a class="rec-link" href="${rec.url}">${rec.title}</a>
-      </div>`).join('')
+      </div>`
+          )
+          .join('')
     : '';
 
   return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="color-scheme" content="light dark"><meta name="supported-color-schemes" content="light dark">${styles}</head><body><h1>Your Read Later Digest</h1>${mainHtml}${recSection}</body></html>`;
@@ -108,27 +124,47 @@ function buildEmailHtml(items, recommendations = []) {
 
 // Send email via iCloud SMTP
 async function sendEmail(html) {
-  const transporter = nodemailer.createTransport({ host: 'smtp.mail.me.com', port: 587, secure: false, auth: { user: SMTP_USER, pass: SMTP_PASS } });
+  const transporter = nodemailer.createTransport({
+    host: 'smtp.mail.me.com',
+    port: 587,
+    secure: false,
+    auth: { user: SMTP_USER, pass: SMTP_PASS },
+  });
   await transporter.verify();
   console.log('✅ SMTP verified');
-  const info = await transporter.sendMail({ from: FROM_EMAIL, to: TO_EMAIL, subject: `Your Read Later Digest — ${dayjs().format('MMM D, YYYY')}`, html });
+  const info = await transporter.sendMail({
+    from: FROM_EMAIL,
+    to: TO_EMAIL,
+    subject: `Your Read Later Digest — ${dayjs().format('MMM D, YYYY')}`,
+    html,
+  });
   console.log('📧 Sent:', info.messageId);
 }
 
-// Main flow with guard for ARCHIVE_ID
+// Main flow with robust recommendation error handling
 (async () => {
   try {
     console.log(`🔑 ARCHIVE_ID: ${ARCHIVE_ID}`);
     const saved = await getRaindropItems(COLLECTION_ID);
-    if (saved.length <= 5) return console.log('<=5 items, skip digest.');
+    if (saved.length <= 5) {
+      console.log('<=5 items, skip digest.');
+      return;
+    }
     const latest = saved.slice(0, 7);
 
     let recs = [];
     if (ARCHIVE_ID) {
-      const archiveItems = await getRaindropItems(ARCHIVE_ID, 20);
-      recs = await getRecommendations(archiveItems, 3);
+      try {
+        console.log('🔍 Fetching archive items for recommendations…');
+        const archiveItems = await getRaindropItems(ARCHIVE_ID, 20);
+        console.log(`🔢 Fetched ${archiveItems.length} archive items.`);
+        recs = await getRecommendations(archiveItems, 3);
+      } catch (err) {
+        console.warn('⚠️ Recommendation step failed, sending without recs:', err.message);
+        recs = [];
+      }
     } else {
-      console.warn('⚠️ No ARCHIVE_ID; skipping recommendations.');
+      console.warn('⚠️ ARCHIVE_ID not set; skipping recommendations.');
     }
 
     const html = buildEmailHtml(latest, recs);
