@@ -27,7 +27,7 @@ async function getRaindropItems(collectionId, perpage = 50) {
   return data.items;
 }
 
-// Tag-based recommendations via NewsAPI
+// Tag-based recommendations
 async function getTagRecommendations(items, topTagCount = 200, perTag = 2) {
   const tagCount = {};
   items.forEach(item => { (item.tags || []).forEach(tag => { tagCount[tag] = (tagCount[tag] || 0) + 1; }); });
@@ -72,12 +72,14 @@ function buildEmailHtml(items, recommendations = []) {
     img.preview { width:100%; border-radius:12px; margin-bottom:1rem; }
     .title, .rec-link { font-size:1.25rem; font-weight:600; margin:0 0 .5rem; color:${linkColor}; text-decoration:none; }
     .description { font-size:.95rem; line-height:1.5; margin-bottom:.75rem; }
-    .meta { font-size:.85rem; color:#555; display:flex; align-items:center; gap:.5rem; margin-bottom:1rem; }
-    .tag { background:#eee; border-radius:3px; padding:2px 6px; font-size:.75rem; color:#555; margin-left:auto; }
+    .meta { font-size:.85rem; color:#555; display:flex; align-items:center; gap:.5rem; margin-bottom:1rem; flex-wrap:wrap; }
+    .tag { background:#eee; border-radius:3px; padding:2px 6px; font-size:.75rem; color:#555; }
     img.icon { width:12px; height:12px; vertical-align:text-bottom; }
     hr { border:none; border-top:1px solid #ccc; margin:2rem 0; }
+    a.tag-link { text-decoration:none; color:#555; }
   </style>`;
 
+  // Main saved items
   const mainHtml = items.map(item => {
     const cover = item.cover ? `<img class="preview" src="${item.cover}" alt="cover"/>` : '';
     const previewUrl = `https://app.raindrop.io/my/${COLLECTION_ID}/item/${item._id}/preview`;
@@ -90,6 +92,7 @@ function buildEmailHtml(items, recommendations = []) {
         <a class="title" href="${previewUrl}">${item.title}</a>
         ${item.excerpt ? `<div class="description">${item.excerpt}</div>` : ''}
         <div class="meta">
+          <a class="tag-link" href="https://app.raindrop.io/my/${COLLECTION_ID}/tag/${encodeURIComponent(item.tags?.[0]||'')}"><span class="tag">#${item.tags?.[0]||''}</span></a>
           <img class="icon" src="${favicon}" alt="favicon"/>
           <a href="https://${domain}" style="color:inherit;text-decoration:none">${domain}</a>
           <span>• Saved on ${date}</span>
@@ -98,6 +101,7 @@ function buildEmailHtml(items, recommendations = []) {
       </div>`;
   }).join('');
 
+  // Recommendations: tag left, then domain
   const recHtml = recommendations.length
     ? `<h2 class="rec">Recommended for You</h2>` + recommendations.map(r => {
         const dom = new URL(r.url).hostname.replace('www.', '');
@@ -106,9 +110,9 @@ function buildEmailHtml(items, recommendations = []) {
           <div class="rec-item">
             <a class="rec-link" href="${r.url}">${r.title}</a>
             <div class="meta">
+              <a class="tag-link" href="https://app.raindrop.io/my/${COLLECTION_ID}/tag/${encodeURIComponent(r.tag)}"><span class="tag">#${r.tag}</span></a>
               <img class="icon" src="${fav}" alt="favicon"/>
               <a href="https://${dom}" style="color:inherit;text-decoration:none">${dom}</a>
-              <span class="tag">#${r.tag}</span>
             </div>
             <hr/>
           </div>`;
