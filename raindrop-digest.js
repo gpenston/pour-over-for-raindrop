@@ -73,7 +73,7 @@ function buildEmailHtml(items, recommendations = []) {
     .title, .rec-link { font-size:1.25rem; font-weight:600; margin:0 0 .5rem; color:${linkColor}; text-decoration:none; }
     .description { font-size:.95rem; line-height:1.5; margin-bottom:.75rem; color:inherit; }
     .meta { font-size:.85rem; color:#555; display:flex; align-items:center; gap:.5rem; margin-bottom:1rem; }
-    .tag { background:#eee; border-radius:3px; padding:2px 6px; font-size:.75rem; color:#555; margin-right:.5rem; }
+    .tag { background:#eee; border-radius:3px; padding:2px 6px; font-size:.75rem; color:#555; }
     img.icon { width:12px; height:12px; vertical-align:text-bottom; }
     hr { border:none; border-top:1px solid #ccc; margin:2rem 0; }
   </style>`;
@@ -99,7 +99,7 @@ function buildEmailHtml(items, recommendations = []) {
       </div>`;
   }).join('');
 
-  // Recommendations
+  // Recommendations with domain then tag
   const recHtml = recommendations.length
     ? `<h2 class="rec">Recommended for You</h2>` + recommendations.map(r => {
         const dom = new URL(r.url).hostname.replace('www.', '');
@@ -108,9 +108,9 @@ function buildEmailHtml(items, recommendations = []) {
           <div class="rec-item">
             <a class="rec-link" href="${r.url}">${r.title}</a>
             <div class="meta">
-              <span class="tag">#${r.tag}</span>
               <img class="icon" src="${fav}" alt="favicon"/>
               <a href="https://${dom}" style="color:inherit;text-decoration:none">${dom}</a>
+              <span> #${r.tag}</span>
             </div>
             <hr/>
           </div>`;
