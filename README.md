@@ -35,7 +35,10 @@ Emails are styled to feel like a lightweight editorial newsletter:
 
 ### 🕒 Schedule
 
-Runs every day at 7:00 AM PT / 10:00 AM ET via cron:
+Runs every day at 8:00 AM Pacific Time (11:00 AM Eastern) via cron:
 ```yaml
 schedule:
-  - cron: '0 14 * * *'
+  - cron: '0 15 * * *'
+```
+The cron expression uses Coordinated Universal Time (UTC), so `0 15 * * *`
+corresponds to 15:00 UTC.
