@@ -25,6 +25,7 @@ Emails are styled to feel like a lightweight editorial newsletter:
 2. Add these repository secrets:
    - `RAINDROP_TOKEN` — Raindrop.io API token
    - `COLLECTION_ID` — ID of your “Read Later” collection
+   - `ARCHIVE_ID` — (optional) archive collection to pull tags for OpenAI recs
    - `SMTP_USER` — Your iCloud (or other) SMTP username
    - `SMTP_PASS` — SMTP app-specific password
    - `TO_EMAIL` — Your email address (e.g. `you@icloud.com`)
