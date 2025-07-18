@@ -25,8 +25,8 @@ Emails are styled to feel like a lightweight editorial newsletter:
 2. Add these repository secrets:
    - `RAINDROP_TOKEN` — Raindrop.io API token
    - `COLLECTION_ID` — ID of your “Read Later” collection
-   - `ARCHIVE_ID` — (optional) archive collection to pull tags for OpenAI recs
-   - `SMTP_USER` — Your iCloud (or other) SMTP username
+   - `ARCHIVE_ID` — (optional) ID of an archive collection for recommendations
+ (or other) SMTP username
    - `SMTP_PASS` — SMTP app-specific password
    - `TO_EMAIL` — Your email address (e.g. `you@icloud.com`)
    - `FROM_EMAIL` — From address (same as above for iCloud)
@@ -43,3 +43,5 @@ schedule:
 ```
 The cron expression uses Coordinated Universal Time (UTC), so `0 15 * * *`
 corresponds to 15:00 UTC.
+You can modify `.github/workflows/digest.yml` to change the send time or
+adjust the schedule as needed.
