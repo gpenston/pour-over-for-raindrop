@@ -101,17 +101,23 @@ function buildEmailHtml(items, recs = []) {
 
   const recHtml = recs.length
     ? `<h2 class="rec">Recommended for You</h2>` + recs.map(r => {
-        const domain = new URL(r.url).hostname.replace('www.','');
-        const icon2  = `https://www.google.com/s2/favicons?domain=${domain}&sz=32`;
+        let domain = '';
+        let icon2  = '';
+        try {
+          domain = new URL(r.url).hostname.replace('www.', '');
+          icon2  = `https://www.google.com/s2/favicons?domain=${domain}&sz=32`;
+        } catch {
+          console.warn(`⚠️ Invalid URL in recommendation: ${r.url}`);
+        }
         const tag2   = r.tag || '';
         const tagLink2 = tag2
           ? `<a href="https://app.raindrop.io/my/${COLLECTION_ID}/tag/%23${encodeURIComponent(tag2)}" class="tag-link"><span class="tag">#${tag2}</span></a>`
           : '';
+        const domainHtml = domain ? `<img class="icon" src="${icon2}"/><a href="https://${domain}" style="color:inherit;text-decoration:none">${domain}</a>` : '';
         return `<div class="rec-item">
           <a class="rec-link" href="${r.url}">${r.title}</a>
           <div class="meta">
-            <img class="icon" src="${icon2}"/><a href="https://${domain}" style="color:inherit;text-decoration:none">${domain}</a>
-            <span>•</span>${tagLink2}
+            ${domainHtml}<span>${domain ? '•' : ''}</span>${tagLink2}
           </div>
           <hr/>
         </div>`;

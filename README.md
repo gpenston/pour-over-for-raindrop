@@ -26,7 +26,7 @@ Emails are styled to feel like a lightweight editorial newsletter:
    - `RAINDROP_TOKEN` — Raindrop.io API token
    - `COLLECTION_ID` — ID of your “Read Later” collection
    - `ARCHIVE_ID` — (optional) ID of an archive collection for recommendations
-   - `SMTP_USER` — Your iCloud (or other) SMTP username
+ (or other) SMTP username
    - `SMTP_PASS` — SMTP app-specific password
    - `TO_EMAIL` — Your email address (e.g. `you@icloud.com`)
    - `FROM_EMAIL` — From address (same as above for iCloud)
