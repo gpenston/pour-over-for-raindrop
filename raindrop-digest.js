@@ -124,7 +124,8 @@ function buildEmailHtml(items, recs = []) {
       }).join('')
     : '';
 
-  return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="color-scheme" content="light dark"><meta name="supported-color-schemes" content="light dark">${styles}</head><body><h1>Your Read Later Digest</h1>${mainHtml}${recHtml}</body></html>`;
+  const signOff = '<p style="font-size:.9rem;color:#555;margin-top:1.5rem">Thanks for reading — happy bookmarking! ✨</p>';
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="color-scheme" content="light dark"><meta name="supported-color-schemes" content="light dark">${styles}</head><body><h1>Your Read Later Digest</h1>${mainHtml}${recHtml}${signOff}</body></html>`;
 }
 
 // Send via iCloud SMTP

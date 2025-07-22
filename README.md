@@ -10,6 +10,7 @@ A GitHub Action that sends you a daily email digest of your saved Raindrop.io bo
 - Responsive email layout with native Apple dark mode support
 - Includes favicons, source metadata, and estimated read time
 - Fully automated via GitHub Actions
+- Friendly sign-off at the end of each email
 
 ### 📬 What It Looks Like
 
