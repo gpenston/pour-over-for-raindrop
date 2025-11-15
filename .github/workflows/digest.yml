@@ -1,9 +1,9 @@
-name: Daily Raindrop Digest
+name: Weekly Raindrop Digest
 
 on:
   schedule:
-    # Runs daily at 15:00 UTC (7 AM PDT)
-    - cron: '0 15 * * *'
+    # Runs weekly on Monday at 16:00 UTC (8 AM PDT)
+    - cron: '0 16 * * MON'
   workflow_dispatch:
 
 jobs:
@@ -11,12 +11,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+
       - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
           node-version: '20'
+
       - name: Install dependencies
         run: npm install
+
       - name: Run digest script
         run: node raindrop-digest.js
         env:
