@@ -133,7 +133,10 @@ async function getRecommendations(tags, recentTitles, count = RECOMMENDATIONS_CO
             `I'm interested in these topics: ${tags.join(', ')}.${contextStr}\n\n` +
             `Based on these interests, search the web and find ${count} recent, high-quality articles ` +
             `published in the last 3 months that align with my reading patterns. ` +
-            `Focus on authoritative sources and avoid surface-level content. ` +
+            `Focus on authoritative sources and avoid surface-level content.\n\n` +
+            `IMPORTANT: Each article should cover a DIFFERENT aspect or angle of my interests. ` +
+            `Provide variety across topics, perspectives, and content types - avoid recommending ` +
+            `multiple articles on the same theme or subject.\n\n` +
             `Respond with a JSON array of objects having "title" and "url" fields. Only return the JSON, no other text.`
   } : {
     url: 'https://api.openai.com/v1/chat/completions',
@@ -344,10 +347,15 @@ async function sendEmail(html) {
       
       const topTags = Object.entries(tagWeights)
         .sort((a, b) => b[1] - a[1])
-        .slice(0, TOP_TAGS_COUNT)
-        .map(([tag]) => tag);
+        .map(([tag]) => tag)
+        .filter(tag => {
+          // Filter out year tags (2024, 2025, etc.) that cause trend-chasing
+          if (/^\d{4}$/.test(tag)) return false;
+          return true;
+        })
+        .slice(0, TOP_TAGS_COUNT);
       
-      console.log('🔝 Top tags (weighted):', topTags);
+      console.log('🔝 Top tags (weighted, filtered):', topTags);
       
       // Extract recent article titles for context
       const recentTitles = saved.slice(0, 10).map(it => it.title);
