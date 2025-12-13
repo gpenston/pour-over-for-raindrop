@@ -131,12 +131,10 @@ async function getRecommendations(tags, recentTitles, count = RECOMMENDATIONS_CO
     name: 'Perplexity',
     prompt: `You are a helpful recommendation engine with web search capabilities. ` +
             `I'm interested in these topics: ${tags.join(', ')}.${contextStr}\n\n` +
-            `Based on these interests, search the web and find ${count} recent, high-quality articles ` +
-            `published in the last 3 months that align with my reading patterns. ` +
-            `Focus on authoritative sources and avoid surface-level content.\n\n` +
-            `IMPORTANT: Each article should cover a DIFFERENT aspect or angle of my interests. ` +
-            `Provide variety across topics, perspectives, and content types - avoid recommending ` +
-            `multiple articles on the same theme or subject.\n\n` +
+            `Find ${count} diverse, high-quality articles from the last 3 months. ` +
+            `Each article should cover a different topic or angle from my interests.\n\n` +
+            `Prefer: case studies, tutorials, deep analyses, research, practical guides, or insightful essays.\n` +
+            `Avoid: trend predictions, "Top X" listicles, or multiple articles on the same theme.\n\n` +
             `Respond with a JSON array of objects having "title" and "url" fields. Only return the JSON, no other text.`
   } : {
     url: 'https://api.openai.com/v1/chat/completions',
