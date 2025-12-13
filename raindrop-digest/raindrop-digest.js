@@ -102,9 +102,45 @@ async function getRaindropItems(collectionId, perpage = RAINDROP_ITEMS_PER_PAGE)
   }, `Raindrop API (collection ${collectionId})`);
 }
 
-// Ask AI for recommendations, fallback on error
+// Group similar tags together to avoid duplication
+function groupSimilarTags(tags) {
+  const groups = [];
+  const used = new Set();
+  
+  // Define similar tag patterns
+  const similarities = {
+    'design': ['ux design', 'ui design', 'design'],
+    'ai': ['ai', 'AI', 'artificial intelligence', 'machine learning'],
+    'improvement': ['self improvement', 'productivity', 'personal development'],
+    'leadership': ['leadership', 'management', 'career'],
+    'games': ['video games', 'gaming', 'role-playing']
+  };
+  
+  // First pass: group similar tags
+  for (const [key, patterns] of Object.entries(similarities)) {
+    const matchedTags = tags.filter(tag => 
+      patterns.some(p => tag.toLowerCase().includes(p.toLowerCase())) && !used.has(tag)
+    );
+    if (matchedTags.length > 0) {
+      groups.push(matchedTags);
+      matchedTags.forEach(t => used.add(t));
+    }
+  }
+  
+  // Second pass: add remaining ungrouped tags individually
+  tags.forEach(tag => {
+    if (!used.has(tag)) {
+      groups.push([tag]);
+      used.add(tag);
+    }
+  });
+  
+  return groups;
+}
+
+// Ask AI for recommendations with tag diversity, fallback on error
 async function getRecommendations(tags, recentTitles, count = RECOMMENDATIONS_COUNT) {
-  console.log(`💡 Generating ${count} recommendations for tags: ${tags.join(', ')}`);
+  console.log(`💡 Generating ${count} recommendations from ${tags.length} tags`);
   
   // Determine which AI provider to use
   const usePerplexity = AI_PROVIDER === 'perplexity' || (PERPLEXITY_API_KEY && !OPENAI_API_KEY);
@@ -119,6 +155,13 @@ async function getRecommendations(tags, recentTitles, count = RECOMMENDATIONS_CO
     return [];
   }
   
+  // Group similar tags to avoid clustering
+  const tagGroups = groupSimilarTags(tags);
+  console.log(`📊 Split into ${tagGroups.length} tag groups for diversity`);
+  
+  // Select tag groups to use (up to count)
+  const selectedGroups = tagGroups.slice(0, count);
+  
   // Build context string from recent article titles
   const contextStr = recentTitles && recentTitles.length > 0
     ? `\n\nRecent articles I've saved: "${recentTitles.slice(0, 8).join('"; "')}"`
@@ -128,70 +171,80 @@ async function getRecommendations(tags, recentTitles, count = RECOMMENDATIONS_CO
     url: 'https://api.perplexity.ai/chat/completions',
     key: PERPLEXITY_API_KEY,
     model: 'sonar-pro',
-    name: 'Perplexity',
-    prompt: `You are a helpful recommendation engine with web search capabilities. ` +
-            `I'm interested in these topics: ${tags.join(', ')}.${contextStr}\n\n` +
-            `Find ${count} diverse, high-quality articles from the last 3 months. ` +
-            `Each article should cover a different topic or angle from my interests.\n\n` +
-            `Prefer: case studies, tutorials, deep analyses, research, practical guides, or insightful essays.\n` +
-            `Avoid: trend predictions, "Top X" listicles, or multiple articles on the same theme.\n\n` +
-            `Respond with a JSON array of objects having "title" and "url" fields. Only return the JSON, no other text.`
+    name: 'Perplexity'
   } : {
     url: 'https://api.openai.com/v1/chat/completions',
     key: OPENAI_API_KEY,
     model: 'gpt-4o-mini',
-    name: 'OpenAI',
-    prompt: `I'm interested in: ${tags.join(', ')}.${contextStr}\n\n` +
-            `Suggest ${count} recent, high-quality articles that match these interests. ` +
-            `Respond with a JSON array of objects having "title" and "url" fields.`
+    name: 'OpenAI'
   };
   
   console.log(`🤖 Using ${apiConfig.name} for recommendations`);
   
-  try {
-    const recs = await retryWithBackoff(async () => {
-      const res = await axios.post(
-        apiConfig.url,
-        {
-          model: apiConfig.model,
-          messages: [
-            { role: 'system', content: 'You are a helpful recommendation engine.' },
-            { role: 'user',   content: apiConfig.prompt }
-          ],
-          temperature: 0.7,
-          max_tokens: 1000
-        },
-        { headers: { Authorization: `Bearer ${apiConfig.key}` } }
-      );
-      
-      let text = res.data.choices[0].message.content.trim();
-      
-      // Handle markdown code blocks (```json ... ```)
-      const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-      if (jsonMatch) {
-        text = jsonMatch[1];
-      }
-      
-      const recs = JSON.parse(text);
-      
-      if (!Array.isArray(recs)) {
-        console.warn(`⚠️ ${apiConfig.name} response is not an array`);
-        return [];
-      }
-      
-      console.log(`✅ Generated ${recs.length} recommendations from ${apiConfig.name}`);
-      return recs;
-    }, `${apiConfig.name} API`);
+  // Make separate requests for each tag group to force diversity
+  const allRecs = [];
+  
+  for (let i = 0; i < selectedGroups.length; i++) {
+    const group = selectedGroups[i];
+    const groupTags = group.join(', ');
+    console.log(`   📌 Group ${i + 1}: ${groupTags}`);
     
-    return recs;
-  } catch (e) {
-    // Gracefully degrade - recommendations are optional
-    console.warn(`⚠️ Could not generate recommendations: ${e.response?.status || e.message}`);
-    if (e.response?.data) {
-      console.warn('   Response data:', JSON.stringify(e.response.data).slice(0, 200));
+    const prompt = usePerplexity 
+      ? `You are a helpful recommendation engine with web search capabilities. ` +
+        `Find 1 high-quality article about: ${groupTags}.${contextStr}\n\n` +
+        `Requirements: Published in last 3 months. ` +
+        `Prefer case studies, tutorials, analyses, research, or practical guides. ` +
+        `Avoid trend predictions or Top X listicles.\n\n` +
+        `Respond with a JSON array with exactly 1 object having "title" and "url" fields. Only return the JSON.`
+      : `Find 1 high-quality recent article about: ${groupTags}.${contextStr}\n` +
+        `Respond with a JSON array with 1 object having "title" and "url" fields.`;
+    
+    try {
+      const rec = await retryWithBackoff(async () => {
+        const res = await axios.post(
+          apiConfig.url,
+          {
+            model: apiConfig.model,
+            messages: [
+              { role: 'system', content: 'You are a helpful recommendation engine.' },
+              { role: 'user', content: prompt }
+            ],
+            temperature: 0.7,
+            max_tokens: 500
+          },
+          { headers: { Authorization: `Bearer ${apiConfig.key}` } }
+        );
+        
+        let text = res.data.choices[0].message.content.trim();
+        
+        // Handle markdown code blocks
+        const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+        if (jsonMatch) {
+          text = jsonMatch[1];
+        }
+        
+        const parsed = JSON.parse(text);
+        
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed[0]; // Take first recommendation
+        } else if (parsed.title && parsed.url) {
+          return parsed; // Single object response
+        }
+        
+        return null;
+      }, `${apiConfig.name} API (group ${i + 1})`);
+      
+      if (rec) {
+        allRecs.push(rec);
+      }
+    } catch (e) {
+      console.warn(`⚠️ Failed to get recommendation for "${groupTags}": ${e.message}`);
+      // Continue with other groups
     }
-    return [];
   }
+  
+  console.log(`✅ Generated ${allRecs.length} diverse recommendations from ${apiConfig.name}`);
+  return allRecs;
 }
 
 // Build HTML email
