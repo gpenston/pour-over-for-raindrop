@@ -103,7 +103,7 @@ async function getRaindropItems(collectionId, perpage = RAINDROP_ITEMS_PER_PAGE)
 }
 
 // Ask AI for recommendations, fallback on error
-async function getRecommendations(tags, count = RECOMMENDATIONS_COUNT) {
+async function getRecommendations(tags, recentTitles, count = RECOMMENDATIONS_COUNT) {
   console.log(`💡 Generating ${count} recommendations for tags: ${tags.join(', ')}`);
   
   // Determine which AI provider to use
@@ -119,23 +119,29 @@ async function getRecommendations(tags, count = RECOMMENDATIONS_COUNT) {
     return [];
   }
   
+  // Build context string from recent article titles
+  const contextStr = recentTitles && recentTitles.length > 0
+    ? `\n\nRecent articles I've saved: "${recentTitles.slice(0, 8).join('"; "')}"`
+    : '';
+  
   const apiConfig = usePerplexity ? {
     url: 'https://api.perplexity.ai/chat/completions',
     key: PERPLEXITY_API_KEY,
     model: 'sonar-pro',
     name: 'Perplexity',
     prompt: `You are a helpful recommendation engine with web search capabilities. ` +
-            `Based on these interest tags: ${tags.join(', ')}, search the web and find ${count} recent, ` +
-            `high-quality articles published in the last 6 months. ` +
-            `Focus on authoritative sources and trending content in these topics. ` +
+            `I'm interested in these topics: ${tags.join(', ')}.${contextStr}\n\n` +
+            `Based on these interests, search the web and find ${count} recent, high-quality articles ` +
+            `published in the last 3 months that align with my reading patterns. ` +
+            `Focus on authoritative sources and avoid surface-level content. ` +
             `Respond with a JSON array of objects having "title" and "url" fields. Only return the JSON, no other text.`
   } : {
     url: 'https://api.openai.com/v1/chat/completions',
     key: OPENAI_API_KEY,
     model: 'gpt-4o-mini',
     name: 'OpenAI',
-    prompt: `Here are my top tags: ${tags.join(', ')}. ` +
-            `Suggest ${count} recent, high-quality articles not already in my Read Later list. ` +
+    prompt: `I'm interested in: ${tags.join(', ')}.${contextStr}\n\n` +
+            `Suggest ${count} recent, high-quality articles that match these interests. ` +
             `Respond with a JSON array of objects having "title" and "url" fields.`
   };
   
@@ -318,11 +324,36 @@ async function sendEmail(html) {
     if (ARCHIVE_ID && (OPENAI_API_KEY || PERPLEXITY_API_KEY)) {
       console.log(`🔍 Fetching archive items from ${ARCHIVE_ID}…`);
       const archive = await getRaindropItems(ARCHIVE_ID, ARCHIVE_FETCH_LIMIT);
-      const count = {};
-      archive.forEach(it => (it.tags||[]).forEach(t => count[t] = (count[t]||0) + 1));
-      const topTags = Object.entries(count).sort((a,b) => b[1]-a[1]).slice(0, TOP_TAGS_COUNT).map(([t]) => t);
-      console.log('🔝 Top archive tags:', topTags);
-      recs = await getRecommendations(topTags);
+      
+      // Weight tags: Read Later (3x) + Archive (1x) to prioritize current interests
+      const tagWeights = {};
+      
+      // Add Read Later tags with 3x weight (current active interests)
+      saved.forEach(it => {
+        (it.tags || []).forEach(tag => {
+          tagWeights[tag] = (tagWeights[tag] || 0) + 3;
+        });
+      });
+      
+      // Add Archive tags with 1x weight (historical interests)
+      archive.forEach(it => {
+        (it.tags || []).forEach(tag => {
+          tagWeights[tag] = (tagWeights[tag] || 0) + 1;
+        });
+      });
+      
+      const topTags = Object.entries(tagWeights)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, TOP_TAGS_COUNT)
+        .map(([tag]) => tag);
+      
+      console.log('🔝 Top tags (weighted):', topTags);
+      
+      // Extract recent article titles for context
+      const recentTitles = saved.slice(0, 10).map(it => it.title);
+      console.log(`📖 Using ${recentTitles.length} recent article titles for context`);
+      
+      recs = await getRecommendations(topTags, recentTitles);
     } else {
       console.warn('⚠️ ARCHIVE_ID or AI API key missing; skipping recommendations');
     }
