@@ -232,39 +232,72 @@ async function getRecommendations(tags, recentTitles, count = RECOMMENDATIONS_CO
         `Respond with a JSON array with 1 object having "title" and "url" fields.`;
     
     try {
-      const rec = await retryWithBackoff(async () => {
-        const res = await axios.post(
-          apiConfig.url,
-          {
-            model: apiConfig.model,
-            messages: [
-              { role: 'system', content: 'You are a helpful recommendation engine.' },
-              { role: 'user', content: prompt }
-            ],
-            temperature: 0.7,
-            max_tokens: 500
-          },
-          { headers: { Authorization: `Bearer ${apiConfig.key}` } }
-        );
+      let rec = null;
+      let attempts = 0;
+      const maxAttempts = 2;
+      
+      while (!rec && attempts < maxAttempts) {
+        attempts++;
         
-        let text = res.data.choices[0].message.content.trim();
+        // Use stricter prompt on retry
+        const retryPrompt = attempts > 1 ? prompt.replace(
+          'Find 1 substantive',
+          'Find 1 substantive article. DO NOT return any article with "Top", "Best", or numbered lists in the title. Find 1 substantive'
+        ) : prompt;
         
-        // Handle markdown code blocks
-        const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-        if (jsonMatch) {
-          text = jsonMatch[1];
+        const candidate = await retryWithBackoff(async () => {
+          const res = await axios.post(
+            apiConfig.url,
+            {
+              model: apiConfig.model,
+              messages: [
+                { role: 'system', content: 'You are a helpful recommendation engine.' },
+                { role: 'user', content: retryPrompt }
+              ],
+              temperature: 0.7,
+              max_tokens: 500
+            },
+            { headers: { Authorization: `Bearer ${apiConfig.key}` } }
+          );
+          
+          let text = res.data.choices[0].message.content.trim();
+          
+          // Handle markdown code blocks
+          const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+          if (jsonMatch) {
+            text = jsonMatch[1];
+          }
+          
+          const parsed = JSON.parse(text);
+          
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            return parsed[0]; // Take first recommendation
+          } else if (parsed.title && parsed.url) {
+            return parsed; // Single object response
+          }
+          
+          return null;
+        }, `${apiConfig.name} API (group ${i + 1}, attempt ${attempts})`);
+        
+        if (candidate && candidate.title) {
+          // Check for listicle patterns in title
+          const title = candidate.title;
+          const isListicle = 
+            /^(Top|Best)\s/i.test(title) || // Starts with "Top" or "Best"
+            /^\d+\s+(Essential|Must|Key|Critical|Important|Powerful|Proven)/i.test(title) || // "5 Essential/Must/etc"
+            /\d+\s+(Tips|Strategies|Ways|Things|Trends|Reasons|Steps|Lessons)/i.test(title) || // "X Tips/Strategies/etc"
+            /:\s*\d+\s+(Tips|Strategies|Ways|Things|Trends)/i.test(title); // Ends with ": 5 Tips"
+          
+          if (isListicle && attempts < maxAttempts) {
+            console.warn(`   ⚠️ Rejected listicle: "${title}", retrying...`);
+            continue; // Try again
+          }
+          
+          rec = candidate;
+        } else {
+          break; // No valid candidate, stop trying
         }
-        
-        const parsed = JSON.parse(text);
-        
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed[0]; // Take first recommendation
-        } else if (parsed.title && parsed.url) {
-          return parsed; // Single object response
-        }
-        
-        return null;
-      }, `${apiConfig.name} API (group ${i + 1})`);
+      }
       
       if (rec) {
         allRecs.push(rec);
