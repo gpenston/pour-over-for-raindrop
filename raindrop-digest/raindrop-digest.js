@@ -102,27 +102,42 @@ async function getRaindropItems(collectionId, perpage = RAINDROP_ITEMS_PER_PAGE)
   }, `Raindrop API (collection ${collectionId})`);
 }
 
-// Group similar tags together to avoid duplication
+// Group similar tags together to avoid duplication and assign categories
 function groupSimilarTags(tags) {
   const groups = [];
   const used = new Set();
   
-  // Define similar tag patterns
+  // Define similar tag patterns with category labels
   const similarities = {
-    'design': ['ux design', 'ui design', 'design'],
-    'ai': ['ai', 'AI', 'artificial intelligence', 'machine learning'],
-    'improvement': ['self improvement', 'productivity', 'personal development'],
-    'leadership': ['leadership', 'management', 'career'],
-    'games': ['video games', 'gaming', 'role-playing']
+    'design': {
+      patterns: ['ux design', 'ui design', 'design'],
+      type: 'professional'
+    },
+    'ai': {
+      patterns: ['ai', 'AI', 'artificial intelligence', 'machine learning', 'technology'],
+      type: 'professional'
+    },
+    'improvement': {
+      patterns: ['self improvement', 'productivity', 'personal development'],
+      type: 'personal'
+    },
+    'leadership': {
+      patterns: ['leadership', 'management', 'career'],
+      type: 'professional'
+    },
+    'media': {
+      patterns: ['video games', 'gaming', 'role-playing', 'movies', 'film', 'tv', 'television', 'books', 'reading', 'literature'],
+      type: 'culture'
+    }
   };
   
-  // First pass: group similar tags
-  for (const [key, patterns] of Object.entries(similarities)) {
+  // First pass: group similar tags with category info
+  for (const [key, config] of Object.entries(similarities)) {
     const matchedTags = tags.filter(tag => 
-      patterns.some(p => tag.toLowerCase().includes(p.toLowerCase())) && !used.has(tag)
+      config.patterns.some(p => tag.toLowerCase().includes(p.toLowerCase())) && !used.has(tag)
     );
     if (matchedTags.length > 0) {
-      groups.push(matchedTags);
+      groups.push({ tags: matchedTags, category: key, type: config.type });
       matchedTags.forEach(t => used.add(t));
     }
   }
@@ -130,7 +145,7 @@ function groupSimilarTags(tags) {
   // Second pass: add remaining ungrouped tags individually
   tags.forEach(tag => {
     if (!used.has(tag)) {
-      groups.push([tag]);
+      groups.push({ tags: [tag], category: 'other', type: 'general' });
       used.add(tag);
     }
   });
@@ -186,15 +201,32 @@ async function getRecommendations(tags, recentTitles, count = RECOMMENDATIONS_CO
   
   for (let i = 0; i < selectedGroups.length; i++) {
     const group = selectedGroups[i];
-    const groupTags = group.join(', ');
-    console.log(`   📌 Group ${i + 1}: ${groupTags}`);
+    const groupTags = group.tags.join(', ');
+    const category = group.category;
+    console.log(`   📌 Group ${i + 1}: ${groupTags} [${category}]`);
+    
+    // Create category-specific prompts to avoid listicles
+    let contentType, avoidContent;
+    
+    if (category === 'media') {
+      contentType = 'thoughtful essays, cultural criticism, in-depth reviews, or personal reflections about games, movies, TV shows, or books';
+      avoidContent = 'industry news, statistics, revenue reports, "Top X" lists, or trend predictions';
+    } else if (category === 'improvement' || category === 'leadership') {
+      contentType = 'personal essays, research-backed analyses, first-person narratives, or deep-dive explorations';
+      avoidContent = '"X strategies", "Y tips", numbered lists, or generic advice compilations';
+    } else {
+      contentType = 'case studies, technical deep-dives, research papers, or thought-provoking essays';
+      avoidContent = 'trend forecasts, "Top X" lists, prediction pieces, or numbered tip lists';
+    }
     
     const prompt = usePerplexity 
       ? `You are a helpful recommendation engine with web search capabilities. ` +
-        `Find 1 high-quality article about: ${groupTags}.${contextStr}\n\n` +
-        `Requirements: Published in last 3 months. ` +
-        `Prefer case studies, tutorials, analyses, research, or practical guides. ` +
-        `Avoid trend predictions or Top X listicles.\n\n` +
+        `Find 1 substantive, thought-provoking article about: ${groupTags}.${contextStr}\n\n` +
+        `Requirements:\n` +
+        `- Published in last 3-6 months\n` +
+        `- Prefer: ${contentType}\n` +
+        `- AVOID: ${avoidContent}\n` +
+        `- Must have depth and originality, not surface-level content\n\n` +
         `Respond with a JSON array with exactly 1 object having "title" and "url" fields. Only return the JSON.`
       : `Find 1 high-quality recent article about: ${groupTags}.${contextStr}\n` +
         `Respond with a JSON array with 1 object having "title" and "url" fields.`;
