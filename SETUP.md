@@ -27,7 +27,7 @@ npm --version   # Should show v10.x or higher
 
 ```bash
 # Navigate to project directory
-cd /Users/gpenston/Library/CloudStorage/OneDrive-Microsoft/Documents/Projects/raindrop-digest
+cd /Users/george/Projects/raindrop-digest
 
 # Install dependencies
 npm install

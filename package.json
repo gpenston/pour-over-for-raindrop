@@ -11,6 +11,6 @@
     "axios": "^1.6.8",
     "dayjs": "^1.11.10",
     "dotenv": "^16.3.1",
-    "nodemailer": "^6.9.8"
+    "nodemailer": "^7.0.11"
   }
 }
