@@ -2,8 +2,8 @@ name: Raindrop Digest
 
 on:
   schedule:
-    # Runs daily at 15:00 UTC (8:00 AM Pacific / 11:00 AM Eastern)
-    - cron: '0 15 * * *'
+    # Runs every other day (Mon, Wed, Fri, Sun) at 8:00 AM Pacific
+    - cron: '0 15 * * 0,1,3,5'
   workflow_dispatch: # Allows manual trigger from GitHub Actions tab
 
 jobs:
