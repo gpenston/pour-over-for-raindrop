@@ -9,6 +9,9 @@ on:
 jobs:
   send-digest:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: raindrop-digest
     
     steps:
       - name: Checkout repository
