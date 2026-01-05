@@ -1,0 +1,37 @@
+name: Raindrop Digest
+
+on:
+  schedule:
+    # Runs daily at 15:00 UTC (8:00 AM Pacific / 11:00 AM Eastern)
+    - cron: '0 15 * * *'
+  workflow_dispatch: # Allows manual trigger from GitHub Actions tab
+
+jobs:
+  send-digest:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Run digest script
+        env:
+          COLLECTION_ID: ${{ secrets.COLLECTION_ID }}
+          ARCHIVE_ID: ${{ secrets.ARCHIVE_ID }}
+          RAINDROP_TOKEN: ${{ secrets.RAINDROP_TOKEN }}
+          PERPLEXITY_API_KEY: ${{ secrets.PERPLEXITY_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          AI_PROVIDER: ${{ secrets.AI_PROVIDER }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          FROM_EMAIL: ${{ secrets.FROM_EMAIL }}
+          TO_EMAIL: ${{ secrets.TO_EMAIL }}
+        run: node raindrop-digest.js
