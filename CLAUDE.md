@@ -95,9 +95,9 @@ RETRY_DELAY_MS = 1000          // Initial retry delay (doubles each attempt)
 ## GitHub Actions
 
 ### Schedule
-- **Runs**: Every other day (Mon, Wed, Fri, Sun)
+- **Runs**: Weekly on Sunday
 - **Time**: 8:00 AM Pacific (15:00 UTC)
-- **Cron**: `0 15 * * 0,1,3,5`
+- **Cron**: `0 15 * * 0`
 - **Manual trigger**: Available from Actions tab
 
 ### Secrets Required
