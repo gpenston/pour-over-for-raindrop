@@ -24,10 +24,24 @@ const NEWS_API_KEY    = process.env.NEWS_API_KEY;
 const OPENAI_API_KEY  = process.env.OPENAI_API_KEY;
 const PERPLEXITY_API_KEY = process.env.PERPLEXITY_API_KEY;
 const AI_PROVIDER     = process.env.AI_PROVIDER || 'openai'; // 'openai' or 'perplexity'
+const SMTP_HOST       = process.env.SMTP_HOST || 'smtp.mail.me.com';
+const SMTP_PORT       = parseInt(process.env.SMTP_PORT || '587', 10);
+const SMTP_SECURE     = process.env.SMTP_SECURE === 'true';
 const SMTP_USER       = process.env.SMTP_USER;
 const SMTP_PASS       = process.env.SMTP_PASS;
 const FROM_EMAIL      = process.env.FROM_EMAIL;
 const TO_EMAIL        = process.env.TO_EMAIL;
+
+// HTML escape helper to prevent XSS
+function escapeHtml(str) {
+  if (!str) return '';
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
 
 // Validate required environment variables
 function validateEnv() {
@@ -399,17 +413,17 @@ function buildEmailHtml(items, recs = []) {
     const date    = dayjs(it.created).format('MMM D');
     const tag     = it.tags?.[0] || '';
     const tagLink = tag
-      ? `<a href="https://app.raindrop.io/my/${COLLECTION_ID}/tag/%23${encodeURIComponent(tag)}" class="tag-link"><span class="tag">#${tag}</span></a>`
+      ? `<a href="https://app.raindrop.io/my/${COLLECTION_ID}/tag/%23${encodeURIComponent(tag)}" class="tag-link"><span class="tag">#${escapeHtml(tag)}</span></a>`
       : '';
-    
+
     const domainHtml = icon
-      ? `<img class="icon" src="${icon}"/><a href="https://${domain}" style="color:inherit;text-decoration:none">${domain}</a>`
-      : `<span>${domain}</span>`;
+      ? `<img class="icon" src="${icon}"/><a href="https://${domain}" style="color:inherit;text-decoration:none">${escapeHtml(domain)}</a>`
+      : `<span>${escapeHtml(domain)}</span>`;
 
     return `<div class="item">
       ${cover}
-      <a class="title" href="${preview}">${it.title}</a>
-      ${it.excerpt ? `<div class="description">${it.excerpt}</div>` : ''}
+      <a class="title" href="${preview}">${escapeHtml(it.title)}</a>
+      ${it.excerpt ? `<div class="description">${escapeHtml(it.excerpt)}</div>` : ''}
       <div class="meta">
         ${domainHtml}
         <span>• Saved on ${date}</span>${tagLink}
@@ -430,11 +444,11 @@ function buildEmailHtml(items, recs = []) {
         }
         const tag2   = r.tag || '';
         const tagLink2 = tag2
-          ? `<a href="https://app.raindrop.io/my/${COLLECTION_ID}/tag/%23${encodeURIComponent(tag2)}" class="tag-link"><span class="tag">#${tag2}</span></a>`
+          ? `<a href="https://app.raindrop.io/my/${COLLECTION_ID}/tag/%23${encodeURIComponent(tag2)}" class="tag-link"><span class="tag">#${escapeHtml(tag2)}</span></a>`
           : '';
-        const domainHtml = domain ? `<img class="icon" src="${icon2}"/><a href="https://${domain}" style="color:inherit;text-decoration:none">${domain}</a>` : '';
+        const domainHtml = domain ? `<img class="icon" src="${icon2}"/><a href="https://${domain}" style="color:inherit;text-decoration:none">${escapeHtml(domain)}</a>` : '';
         return `<div class="rec-item">
-          <a class="rec-link" href="${r.url}">${r.title}</a>
+          <a class="rec-link" href="${escapeHtml(r.url)}">${escapeHtml(r.title)}</a>
           <div class="meta">
             ${domainHtml}<span>${domain ? '•' : ''}</span>${tagLink2}
           </div>
@@ -447,13 +461,13 @@ function buildEmailHtml(items, recs = []) {
   return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="color-scheme" content="light dark"><meta name="supported-color-schemes" content="light dark">${styles}</head><body><h1>Your Pour Over Digest</h1>${mainHtml}${recHtml}${signOff}</body></html>`;
 }
 
-// Send via iCloud SMTP
+// Send via SMTP
 async function sendEmail(html) {
   return retryWithBackoff(async () => {
     const transporter = nodemailer.createTransport({
-      host: 'smtp.mail.me.com',
-      port: 587,
-      secure: false,
+      host: SMTP_HOST,
+      port: SMTP_PORT,
+      secure: SMTP_SECURE,
       auth: { user: SMTP_USER, pass: SMTP_PASS }
     });
     

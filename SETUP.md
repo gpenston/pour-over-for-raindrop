@@ -26,8 +26,9 @@ npm --version   # Should show v10.x or higher
 ### 2. Clone and Setup Project
 
 ```bash
-# Navigate to project directory
-cd /Users/george/Projects/pour-over-for-raindrop
+# Clone the repository
+git clone https://github.com/gpenston/pour-over-for-raindrop.git
+cd pour-over-for-raindrop
 
 # Install dependencies
 npm install
@@ -49,14 +50,16 @@ open -a TextEdit .env
 **Required values:**
 - `RAINDROP_TOKEN` - Get from https://app.raindrop.io/settings/integrations
 - `COLLECTION_ID` - Find in URL: https://app.raindrop.io/my/[THIS_NUMBER]
-- `SMTP_USER` - Your @icloud.com email
-- `SMTP_PASS` - App-specific password from https://appleid.apple.com/account/manage
-- `FROM_EMAIL` - Same as SMTP_USER
+- `SMTP_USER` - Your email address
+- `SMTP_PASS` - App-specific password (see env.example for provider-specific instructions)
+- `FROM_EMAIL` - Sender email address
 - `TO_EMAIL` - Where to send the digest
 
 **Optional values:**
+- `SMTP_HOST` - SMTP server (defaults to iCloud: smtp.mail.me.com)
+- `SMTP_PORT` - SMTP port (defaults to 587)
 - `ARCHIVE_ID` - Another collection for recommendation tags
-- `OPENAI_API_KEY` - For AI-powered recommendations
+- `OPENAI_API_KEY` or `PERPLEXITY_API_KEY` - For AI-powered recommendations
 
 ### 4. Test Locally
 

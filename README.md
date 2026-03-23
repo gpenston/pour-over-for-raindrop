@@ -30,10 +30,12 @@ Emails are styled to feel like a lightweight editorial newsletter:
    - `RAINDROP_TOKEN` — Get from [Raindrop.io Settings](https://app.raindrop.io/settings/integrations)
    - `COLLECTION_ID` — Find in your collection URL: `https://app.raindrop.io/my/{COLLECTION_ID}`
    - `ARCHIVE_ID` — (optional) ID of an archive collection for generating recommendations
-   - `SMTP_USER` — Your iCloud email address
-   - `SMTP_PASS` — iCloud app-specific password ([generate here](https://appleid.apple.com/account/manage))
+   - `SMTP_HOST` — (optional) SMTP server, defaults to iCloud (`smtp.mail.me.com`)
+   - `SMTP_PORT` — (optional) SMTP port, defaults to `587`
+   - `SMTP_USER` — Your email address
+   - `SMTP_PASS` — App-specific password (see [Email Providers](#-email-providers) below)
    - `TO_EMAIL` — Where to send the digest
-   - `FROM_EMAIL` — From address (same as SMTP_USER for iCloud)
+   - `FROM_EMAIL` — Sender email address
    - `PERPLEXITY_API_KEY` or `OPENAI_API_KEY` — (optional) For AI-powered recommendations
    - `AI_PROVIDER` — (optional) `'openai'` or `'perplexity'` (defaults to `'openai'`)
 
@@ -74,15 +76,18 @@ See [SETUP.md](./SETUP.md) for detailed local development instructions.
 |----------|-------------|-----------------|
 | `RAINDROP_TOKEN` | Raindrop.io API token | [Raindrop.io Settings](https://app.raindrop.io/settings/integrations) |
 | `COLLECTION_ID` | Your "Read Later" collection ID | URL: `https://app.raindrop.io/my/{COLLECTION_ID}` |
-| `SMTP_USER` | SMTP username (iCloud email) | Your @icloud.com address |
-| `SMTP_PASS` | SMTP app-specific password | [Apple ID Management](https://appleid.apple.com/account/manage) |
-| `FROM_EMAIL` | From email address | Same as SMTP_USER for iCloud |
+| `SMTP_USER` | SMTP username (your email) | Your email address |
+| `SMTP_PASS` | SMTP app-specific password | See [Email Providers](#-email-providers) |
+| `FROM_EMAIL` | From email address | Your email address |
 | `TO_EMAIL` | Recipient email address | Your email address |
 
 ### Optional Environment Variables
 
 | Variable | Description | Default |
 |----------|-------------|---------|
+| `SMTP_HOST` | SMTP server hostname | `smtp.mail.me.com` (iCloud) |
+| `SMTP_PORT` | SMTP port | `587` |
+| `SMTP_SECURE` | Use TLS | `false` |
 | `ARCHIVE_ID` | Archive collection ID for recommendations | None |
 | `NEWS_API_KEY` | NewsAPI key for recommendations (free at [newsapi.org](https://newsapi.org)) | None |
 | `OPENAI_API_KEY` | OpenAI API key (fallback if `NEWS_API_KEY` not set) | None |
@@ -97,6 +102,49 @@ You can modify these constants in `pour-over.js`:
 - `MIN_ITEMS_THRESHOLD` (default: 5) — Minimum items required to send digest
 - `RECOMMENDATIONS_COUNT` (default: 5) — Number of AI recommendations
 - `TOP_TAGS_COUNT` (default: 10) — Number of top tags to use for recommendations
+
+## 📧 Email Providers
+
+The default configuration uses iCloud Mail, but you can use any SMTP provider. Here are setup instructions for common providers:
+
+### iCloud (Default)
+
+1. Go to [Apple ID Management](https://appleid.apple.com/account/manage)
+2. Sign in and navigate to "App-Specific Passwords"
+3. Generate a new password for "Raindrop Digest"
+4. Use your `@icloud.com` email as `SMTP_USER`
+
+No need to set `SMTP_HOST` or `SMTP_PORT` — the defaults work for iCloud.
+
+### Gmail
+
+1. Enable 2-Factor Authentication on your Google account
+2. Go to [App Passwords](https://myaccount.google.com/apppasswords)
+3. Generate an app password for "Mail"
+
+```
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=your_email@gmail.com
+SMTP_PASS=your_app_password
+```
+
+### Outlook / Microsoft 365
+
+1. Enable 2-Factor Authentication on your Microsoft account
+2. Go to [Security Settings](https://account.microsoft.com/security)
+3. Create an app password under "Additional security options"
+
+```
+SMTP_HOST=smtp.office365.com
+SMTP_PORT=587
+SMTP_USER=your_email@outlook.com
+SMTP_PASS=your_app_password
+```
+
+### Other Providers
+
+See `env.example` for more provider configurations (Yahoo, Fastmail, etc.).
 
 ## 🕒 Schedule
 
@@ -159,6 +207,9 @@ pour-over-for-raindrop/
 ├── pour-over.js              # Main script
 ├── README.md                 # This file
 ├── SETUP.md                  # Detailed setup guide
+├── CONTRIBUTING.md           # Contribution guidelines
+├── SECURITY.md               # Security information
+├── LICENSE                   # MIT License
 └── TODO.md                   # Development roadmap
 ```
 
@@ -194,7 +245,7 @@ console.log('Preview saved to preview.html');
 
 ## 📝 License
 
-This project is for personal use. Feel free to fork and modify for your own needs.
+MIT License — see [LICENSE](./LICENSE) for details.
 
 ## 🙏 Acknowledgments
 
