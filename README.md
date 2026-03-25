@@ -265,7 +265,7 @@ console.log('Preview saved to preview.html');
 
 Pour Over is free, and always will be. If it saves you time, consider passing it forward.
 
-Two people in my family live with [Friedreich's Ataxia](https://www.curefa.org/about-fa/understanding-fa/what-is-fa) — a progressive neurological condition with no known cure. The [Friedreich's Ataxia Research Alliance (FARA)](https://www.curefa.org/) funds the research working to change that.
+The [Friedreich's Ataxia Research Alliance (FARA)](https://www.curefa.org/) is a nonprofit funding research into a progressive neurological condition with no known cure that directly impacts my family.
 
 **[Donate to FARA →](https://www.curefa.org/donate)**
 
