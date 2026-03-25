@@ -86,6 +86,8 @@ See [SETUP.md](./SETUP.md) for detailed local development instructions.
 |----------|-------------|---------|
 | `ARCHIVE_ID` | Archive collection ID for tag-based recommendations | None |
 | `NEWS_API_KEY` | NewsAPI key for recommendations (free at [newsapi.org](https://newsapi.org)) | None |
+| `DIGEST_SCHEDULE` | When to send: `daily`, `weekly`, or day names like `mon,wed,fri` | `weekly` (Sunday) |
+| `DIGEST_TIME` | Time of day: `morning`, `noon`, or `night` | `morning` (8am PT) |
 | `SMTP_HOST` | SMTP server hostname | `smtp.mail.me.com` (iCloud) |
 | `SMTP_PORT` | SMTP server port | `587` |
 
@@ -100,14 +102,18 @@ You can modify these constants in `pour-over.js`:
 
 ## 🕒 Schedule
 
-The GitHub Action runs **every Sunday at 8:00 AM Pacific Time** (11:00 AM Eastern, 15:00 UTC) by default:
+No cron editing required. Set two GitHub secrets to control when your digest arrives:
 
-```yaml
-schedule:
-  - cron: '0 15 * * 0'
-```
+| Secret | Options | Default |
+|--------|---------|---------|
+| `DIGEST_SCHEDULE` | `daily`, `weekly`, `monday`, `mon,wed,fri`, `tue-thu`, `sat,sun` | `weekly` (Sunday) |
+| `DIGEST_TIME` | `morning` (8am PT), `noon` (12pm PT), `night` (8pm PT) | `morning` |
 
-To change the schedule, edit `.github/workflows/digest.yml` and modify the cron expression. Use [crontab.guru](https://crontab.guru/) to help create your schedule. For example, `'0 15 * * *'` would run daily.
+**Examples:**
+- Every weekday morning → `DIGEST_SCHEDULE=mon,tue,wed,thu,fri` + `DIGEST_TIME=morning`
+- Tuesday and Thursday at noon → `DIGEST_SCHEDULE=tue,thu` + `DIGEST_TIME=noon`
+- Daily at night → `DIGEST_SCHEDULE=daily` + `DIGEST_TIME=night`
+- Just Sundays in the morning (default) → no secrets needed
 
 ## 🛠️ How It Works
 

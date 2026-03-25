@@ -133,6 +133,8 @@ Then open `preview.html` in your browser to see what the email looks like.
    - `COLLECTION_ID`
    - `ARCHIVE_ID` (optional)
    - `NEWSAPI_KEY` (optional, recommended)
+   - `DIGEST_SCHEDULE` (optional, e.g. `weekly`, `daily`, `mon,wed,fri`)
+   - `DIGEST_TIME` (optional, e.g. `morning`, `noon`, `night`)
    - `SMTP_USER`
    - `SMTP_PASS`
    - `FROM_EMAIL`
@@ -150,17 +152,10 @@ After pushing your changes:
 
 ### Schedule
 
-The workflow runs automatically every Sunday at:
-- **8:00 AM Pacific Time** (15:00 UTC)
-- **11:00 AM Eastern Time**
+No cron editing needed. Set these two secrets in your repo to control timing:
 
-To change the schedule, edit `.github/workflows/digest.yml`:
-```yaml
-schedule:
-  - cron: '0 15 * * 0'  # Change this line (0 = Sunday)
-```
-
-Use [crontab.guru](https://crontab.guru/) to build your own schedule.
+- `DIGEST_SCHEDULE` — `daily`, `weekly` (default, Sunday), or specific days like `mon,wed,fri` or `tue-thu`
+- `DIGEST_TIME` — `morning` (8am PT, default), `noon` (12pm PT), or `night` (8pm PT)
 
 ## Troubleshooting
 

@@ -21,6 +21,8 @@ const COLLECTION_ID   = process.env.COLLECTION_ID;
 const ARCHIVE_ID      = process.env.ARCHIVE_ID;
 const RAINDROP_TOKEN  = process.env.RAINDROP_TOKEN;
 const NEWS_API_KEY    = process.env.NEWS_API_KEY;
+const DIGEST_SCHEDULE = (process.env.DIGEST_SCHEDULE || 'weekly').toLowerCase().trim();
+const DIGEST_TIME     = (process.env.DIGEST_TIME     || 'morning').toLowerCase().trim();
 const SMTP_HOST       = process.env.SMTP_HOST || 'smtp.mail.me.com';
 const SMTP_PORT       = parseInt(process.env.SMTP_PORT || '587', 10);
 const SMTP_USER       = process.env.SMTP_USER;
@@ -51,6 +53,48 @@ function validateEnv() {
   }
   
   console.log('✅ Environment variables validated');
+}
+
+// Check if the digest should run now based on DIGEST_SCHEDULE and DIGEST_TIME
+// The workflow fires 3x/day (3, 15, 19 UTC); this function gates whether to actually send.
+function shouldRunNow() {
+  const now = new Date();
+  const utcHour = now.getUTCHours();
+  const utcDay  = now.getUTCDay(); // 0=Sun … 6=Sat
+
+  // Map fuzzy time labels to the UTC hours the workflow fires at
+  const timeToUtcHour = { morning: 15, noon: 19, night: 3 };
+  const targetHour = timeToUtcHour[DIGEST_TIME] ?? 15;
+
+  if (utcHour !== targetHour) {
+    console.log(`⏰ Skipping — not the right time slot (now ${utcHour}:00 UTC, '${DIGEST_TIME}' fires at ${targetHour}:00 UTC)`);
+    return false;
+  }
+
+  // Parse DIGEST_SCHEDULE into a set of day numbers
+  const DAY_NAMES = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
+
+  let targetDays;
+  if (DIGEST_SCHEDULE === 'daily') {
+    return true; // Any day is fine
+  } else if (DIGEST_SCHEDULE === 'weekly') {
+    targetDays = new Set([0]); // Sunday
+  } else {
+    // Support comma or hyphen separated day names/abbreviations/numbers
+    // e.g. "mon,wed,fri"  "tue-thu"  "1,3,5"  "saturday"
+    const parts = DIGEST_SCHEDULE.split(/[\s,]+/);
+    targetDays = new Set(parts.map(p => {
+      const n = parseInt(p, 10);
+      if (!isNaN(n) && n >= 0 && n <= 6) return n;
+      const idx = DAY_NAMES.findIndex(d => d.startsWith(p.slice(0, 3)));
+      return idx >= 0 ? idx : null;
+    }).filter(d => d !== null));
+  }
+
+  if (targetDays.has(utcDay)) return true;
+
+  console.log(`📅 Skipping — today is ${DAY_NAMES[utcDay]}, schedule is '${DIGEST_SCHEDULE}'`);
+  return false;
 }
 
 // Retry wrapper with exponential backoff
@@ -272,8 +316,10 @@ async function sendEmail(html) {
 (async () => {
   try {
     validateEnv();
-    
-    console.log('🔑 CONFIG:', { COLLECTION_ID, ARCHIVE_ID, REC_SOURCE: NEWS_API_KEY ? 'NewsAPI' : 'None' });
+
+    if (!shouldRunNow()) return; // Not the right day/time — exit cleanly
+
+    console.log('🔑 CONFIG:', { COLLECTION_ID, ARCHIVE_ID, DIGEST_SCHEDULE, DIGEST_TIME, REC_SOURCE: NEWS_API_KEY ? 'NewsAPI' : 'None' });
     
     const saved = await getRaindropItems(COLLECTION_ID);
     

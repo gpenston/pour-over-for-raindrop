@@ -2,8 +2,9 @@ name: Pour Over for Raindrop
 
 on:
   schedule:
-    # Runs weekly on Sunday at 8:00 AM Pacific
-    - cron: '0 15 * * 0'
+    # Runs 3x daily at the UTC hours that map to morning (15), noon (19), and night (03) Pacific.
+    # The script uses DIGEST_SCHEDULE and DIGEST_TIME to decide whether to actually send.
+    - cron: '0 3,15,19 * * *'
   workflow_dispatch: # Allows manual trigger from GitHub Actions tab
 
 env:
@@ -31,6 +32,8 @@ jobs:
           ARCHIVE_ID: ${{ secrets.ARCHIVE_ID }}
           RAINDROP_TOKEN: ${{ secrets.RAINDROP_TOKEN }}
           NEWS_API_KEY: ${{ secrets.NEWSAPI_KEY }}
+          DIGEST_SCHEDULE: ${{ secrets.DIGEST_SCHEDULE }}
+          DIGEST_TIME: ${{ secrets.DIGEST_TIME }}
           SMTP_HOST: ${{ secrets.SMTP_HOST }}
           SMTP_PORT: ${{ secrets.SMTP_PORT }}
           SMTP_USER: ${{ secrets.SMTP_USER }}
