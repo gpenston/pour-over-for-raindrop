@@ -2,6 +2,8 @@
 
 Your read later bookmarks, brewed fresh and delivered to your inbox. Clean formatting, dark/light mode support, and AI-powered article recommendations. Works as a GitHub Action for automated delivery or run locally.
 
+**[Project page →](https://penston.studio/pour-over/)**
+
 ## ✨ Features
 
 - **📚 Recent Bookmarks**: Pulls up to 7 of your most recent "Read Later" saves
