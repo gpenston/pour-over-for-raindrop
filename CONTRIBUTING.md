@@ -5,7 +5,7 @@ Thanks for your interest in contributing! This is a straightforward project, and
 ## Getting Started
 
 1. Fork the repository
-2. Clone your fork: `git clone https://github.com/YOUR_USERNAME/raindrop-digest.git`
+2. Clone your fork: `git clone https://github.com/YOUR_USERNAME/pour-over-for-raindrop.git`
 3. Install dependencies: `npm install`
 4. Copy `env.example` to `.env` and fill in your credentials
 5. Test locally: `npm start`
@@ -14,7 +14,7 @@ Thanks for your interest in contributing! This is a straightforward project, and
 
 This project values **simplicity over complexity**:
 
-- **Single file design** - The entire script lives in `raindrop-digest.js` (~500 lines). This is intentional. Don't split it into modules unless there's a very compelling reason.
+- **Single file design** - The entire script lives in `pour-over.js` (~400 lines). This is intentional. Don't split it into modules unless there's a very compelling reason.
 - **Minimal dependencies** - Only add dependencies if absolutely necessary.
 - **No TypeScript** - Plain JavaScript is fine for this scale.
 - **No tests** - The project is simple enough that manual testing is sufficient.

@@ -34,7 +34,7 @@ Emails are styled to feel like a lightweight editorial newsletter:
    - `SMTP_PASS` — App-specific password (see [Email Providers](#-email-providers) below)
    - `TO_EMAIL` — Where to send the digest
    - `FROM_EMAIL` — From address (usually same as SMTP_USER)
-   - `NEWS_API_KEY` — (optional, recommended) Free key from [newsapi.org](https://newsapi.org/register) for article recommendations
+   - `NEWSAPI_KEY` — (optional, recommended) Free key from [newsapi.org](https://newsapi.org/register) for article recommendations
 
    > **Note:** The default SMTP configuration uses iCloud Mail (`smtp.mail.me.com`). To use Gmail, Outlook, or another provider, also set `SMTP_HOST` and `SMTP_PORT` secrets. See [Email Providers](#-email-providers) below.
 
@@ -142,7 +142,7 @@ SMTP_PASS=your_app_password
 
 ### Other Providers
 
-See `env.example` for more provider configurations (Yahoo, Fastmail, etc.).
+See `env.example` for more provider configurations (Fastmail, etc.).
 
 ## 🕒 Schedule
 
@@ -206,7 +206,6 @@ By default, Pour Over uses **iCloud Mail**. To use a different provider, set `SM
 | **iCloud** *(default)* | `smtp.mail.me.com` | `587` | Requires [app-specific password](https://appleid.apple.com/account/manage) |
 | **Gmail** | `smtp.gmail.com` | `587` | Requires [app password](https://myaccount.google.com/apppasswords) (2FA must be on) |
 | **Outlook / Hotmail** | `smtp-mail.outlook.com` | `587` | Use your full email as `SMTP_USER` |
-| **Yahoo Mail** | `smtp.mail.yahoo.com` | `587` | Requires [app password](https://login.yahoo.com/account/security) |
 | **Fastmail** | `smtp.fastmail.com` | `587` | Use your full email as `SMTP_USER` |
 
 > **Note:** Most providers require an app-specific password (not your regular login password). Check your email provider's security settings to generate one.

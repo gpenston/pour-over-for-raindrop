@@ -94,7 +94,7 @@ function shouldRunNow() {
   } else {
     // Support comma or hyphen separated day names/abbreviations/numbers
     // e.g. "mon,wed,fri"  "tue-thu"  "1,3,5"  "saturday"
-    const parts = DIGEST_SCHEDULE.split(/[\s,]+/);
+    const parts = DIGEST_SCHEDULE.split(/[\s,\-]+/);
     targetDays = new Set(parts.map(p => {
       const n = parseInt(p, 10);
       if (!isNaN(n) && n >= 0 && n <= 6) return n;
@@ -331,7 +331,7 @@ async function sendEmail(html) {
 
     if (!shouldRunNow()) return; // Not the right day/time — exit cleanly
 
-    console.log('🔑 CONFIG:', { COLLECTION_ID, ARCHIVE_ID, DIGEST_SCHEDULE, DIGEST_TIME, REC_SOURCE: NEWS_API_KEY ? 'NewsAPI' : 'None' });
+    console.log('🔑 CONFIG:', { DIGEST_SCHEDULE, DIGEST_TIME, REC_SOURCE: NEWS_API_KEY ? 'NewsAPI' : 'None' });
     
     const saved = await getRaindropItems(COLLECTION_ID);
     

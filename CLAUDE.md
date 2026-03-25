@@ -21,12 +21,12 @@ npm start            # Run the digest script (sends email)
 ### Key Files
 | File | Purpose |
 |------|---------|
-| `raindrop-digest.js` | Main script (~500 lines) - orchestrates everything |
+| `pour-over.js` | Main script (~400 lines) - orchestrates everything |
 | `.github/workflows/digest.yml` | GitHub Actions automation |
 | `.env` | Local credentials (gitignored) |
 | `env.example` | Template for .env setup |
 
-### Important Constants (in raindrop-digest.js)
+### Important Constants (in pour-over.js)
 ```javascript
 MAX_ITEMS_TO_SHOW = 7          // Recent items in digest
 ARCHIVE_FETCH_LIMIT = 100      // Archive items for tag analysis
@@ -44,10 +44,10 @@ RETRY_DELAY_MS = 1000          // Initial retry delay (doubles each attempt)
 2. **Fetches bookmarks** - Gets recent items from Read Later collection via Raindrop API
 3. **Analyzes tags** - Weights tags from Read Later (3x) and Archive (1x) collections
 4. **Filters tags** - Removes year tags (2024, 2025) to avoid trend-chasing
-5. **Generates recommendations** - Uses Perplexity/OpenAI to find relevant articles
+5. **Generates recommendations** - Uses NewsAPI to find relevant articles (optional, requires NEWS_API_KEY)
 6. **Filters listicles** - Rejects "Top X" and numbered tip lists
 7. **Builds HTML email** - Creates responsive dark/light mode email
-8. **Sends via SMTP** - Delivers through iCloud Mail
+8. **Sends via SMTP** - Delivers through configurable SMTP provider (defaults to iCloud)
 
 ### Main Functions
 | Function | Purpose |
@@ -58,13 +58,12 @@ RETRY_DELAY_MS = 1000          // Initial retry delay (doubles each attempt)
 | `groupSimilarTags()` | Categorize tags to improve recommendation diversity |
 | `getRecommendations()` | Get AI-powered article suggestions |
 | `buildEmailHtml()` | Generate responsive HTML email |
-| `sendEmail()` | Send via iCloud SMTP |
+| `sendEmail()` | Send via configurable SMTP |
 
 ### API Integrations
 - **Raindrop.io API** - Fetches bookmarks from collections
-- **Perplexity API** (primary) - `sonar-pro` model with web search
-- **OpenAI API** (fallback) - `gpt-4o-mini` model
-- **SMTP** - Configurable (defaults to iCloud)
+- **NewsAPI** (optional) - Article recommendations based on top tags
+- **SMTP** - Configurable provider (defaults to iCloud)
 
 ## Configuration
 
@@ -75,8 +74,8 @@ RETRY_DELAY_MS = 1000          // Initial retry delay (doubles each attempt)
 |----------|-------------|
 | `RAINDROP_TOKEN` | Raindrop.io API token |
 | `COLLECTION_ID` | Read Later collection ID |
-| `SMTP_USER` | iCloud email address |
-| `SMTP_PASS` | iCloud app-specific password |
+| `SMTP_USER` | SMTP email address |
+| `SMTP_PASS` | App-specific password |
 | `FROM_EMAIL` | Sender email address |
 | `TO_EMAIL` | Recipient email address |
 
@@ -84,19 +83,19 @@ RETRY_DELAY_MS = 1000          // Initial retry delay (doubles each attempt)
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `ARCHIVE_ID` | Archive collection ID for tag analysis | None |
-| `PERPLEXITY_API_KEY` | Perplexity API key | None |
-| `OPENAI_API_KEY` | OpenAI API key | None |
-| `AI_PROVIDER` | `'perplexity'` or `'openai'` | `'openai'` |
-| `SMTP_HOST` | SMTP server hostname | `'smtp.mail.me.com'` |
+| `NEWS_API_KEY` | NewsAPI key for recommendations | None |
+| `DIGEST_SCHEDULE` | `daily`, `weekly`, or day names e.g. `mon,wed,fri` | `weekly` |
+| `DIGEST_TIME` | `morning`, `noon`, or `night` | `morning` |
+| `SMTP_HOST` | SMTP server hostname | `smtp.mail.me.com` |
 | `SMTP_PORT` | SMTP port | `587` |
-| `SMTP_SECURE` | Use TLS | `'false'` |
+| `SMTP_SECURE` | Use TLS (set `true` for port 465) | `false` |
 
 ## GitHub Actions
 
 ### Schedule
-- **Runs**: Weekly on Sunday
-- **Time**: 8:00 AM Pacific (15:00 UTC)
-- **Cron**: `0 15 * * 0`
+- **Workflow fires**: 3x daily at 03:00, 15:00, 19:00 UTC
+- **Actual send time**: Controlled by `DIGEST_SCHEDULE` + `DIGEST_TIME` secrets
+- **Default**: Sunday mornings at 8am PT (`weekly` + `morning`)
 - **Manual trigger**: Available from Actions tab
 
 ### Secrets Required
@@ -115,7 +114,7 @@ Settings > Secrets and variables > Actions
 - **Retry on 5xx errors** - Server issues are transient
 - **Retry on 429** - Rate limits pass with time
 - **Fail fast on 4xx** - Client errors won't fix themselves
-- **Graceful degradation** - Skip recommendations if AI fails, still send digest
+- **Graceful degradation** - Skip recommendations if NewsAPI fails, still send digest
 
 ### Testing Locally
 ```bash
@@ -131,7 +130,7 @@ npm start
 
 ### Preview Email Without Sending
 ```javascript
-// Temporarily modify raindrop-digest.js:
+// Temporarily modify pour-over.js:
 import { writeFileSync } from 'fs';
 writeFileSync('preview.html', html);
 console.log('Preview saved to preview.html');
@@ -162,19 +161,23 @@ Titles are rejected if they match:
 ## File Structure
 
 ```
-raindrop-digest/
+pour-over-for-raindrop/
 ├── .github/
 │   └── workflows/
 │       └── digest.yml        # GitHub Actions automation
 ├── .gitignore                # Ignores .env, node_modules
 ├── CLAUDE.md                 # This file - AI assistant context
+├── CODE_OF_CONDUCT.md        # Contributor code of conduct
+├── CONTRIBUTING.md           # Contribution guidelines
+├── LICENSE                   # MIT License
 ├── README.md                 # Public documentation
+├── SECURITY.md               # Security information
 ├── SETUP.md                  # Local development guide
-├── TODO.md                   # Task list and roadmap
+├── TODO.md                   # Development roadmap
 ├── env.example               # Template for .env
 ├── package.json              # Dependencies
 ├── package-lock.json         # Locked versions
-└── raindrop-digest.js        # Main script
+└── pour-over.js              # Main script
 ```
 
 ## Dependencies
@@ -198,11 +201,10 @@ raindrop-digest/
 - Ensure using app-specific password (not regular iCloud password)
 - Test locally with `npm start`
 
-### AI Recommendations Failing
-- Script gracefully skips recommendations on failure
-- Check API key validity and billing status
-- Perplexity status: https://status.perplexity.ai/
-- OpenAI status: https://status.openai.com/
+### Recommendations Not Appearing
+- Script gracefully skips recommendations if NewsAPI fails
+- Requires `NEWS_API_KEY` (or `NEWSAPI_KEY` secret in GitHub Actions)
+- Check key validity at https://newsapi.org
 
 ## Context for AI Assistants
 
@@ -228,5 +230,4 @@ When working on this project:
 
 ---
 
-**Last Updated**: 2026-02-04
-**Maintained By**: Claude AI assistant
+**Last Updated**: 2026-03-25

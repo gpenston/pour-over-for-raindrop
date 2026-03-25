@@ -31,4 +31,5 @@ coverage/
 *.tmp
 temp/
 tmp/
+preview.html
 

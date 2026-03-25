@@ -8,7 +8,7 @@ This project requires several API keys and credentials. Handle them carefully:
 
 Never commit these to version control:
 - `.env` file (contains your credentials)
-- API keys (Raindrop, OpenAI, Perplexity)
+- API keys (Raindrop, NewsAPI)
 - SMTP passwords
 - Any app-specific passwords
 
@@ -25,7 +25,7 @@ When using GitHub Actions, store credentials as repository secrets:
 
 Use minimal permissions where possible:
 - **Raindrop.io**: Read-only access is sufficient for this project
-- **OpenAI/Perplexity**: Standard API access
+- **NewsAPI**: Standard free-tier API access
 - **SMTP**: Use app-specific passwords, not your main account password
 
 ## If Credentials Are Compromised
@@ -33,10 +33,10 @@ Use minimal permissions where possible:
 If you accidentally expose credentials:
 
 1. **Raindrop.io**: Regenerate your API token at https://app.raindrop.io/settings/integrations
-2. **OpenAI**: Rotate your API key at https://platform.openai.com/api-keys
-3. **Perplexity**: Rotate your API key at https://www.perplexity.ai/settings/api
-4. **iCloud**: Revoke the app-specific password at https://appleid.apple.com/account/manage
-5. **Gmail**: Revoke the app password in your Google Account security settings
+2. **NewsAPI**: Rotate your API key at https://newsapi.org/account
+3. **iCloud**: Revoke the app-specific password at https://appleid.apple.com/account/manage
+4. **Gmail**: Revoke the app password in your Google Account security settings
+5. **Other SMTP providers**: Revoke the app password in your provider's security settings
 
 ## Known Considerations
 
@@ -49,7 +49,7 @@ If you accidentally expose credentials:
 ### Data Flow
 
 - Your Raindrop.io bookmarks are fetched via API (read-only)
-- Bookmark titles are sent to AI providers for recommendation context
+- Top tags from your bookmarks are sent to NewsAPI for recommendation queries
 - Emails are sent via your configured SMTP provider
 - No data is stored or logged beyond the current execution
 
