@@ -206,11 +206,19 @@ async function getNewsRecommendations(tags, savedUrls = [], count = RECOMMENDATI
 
     console.log(`📰 NewsAPI returned ${articles.length} usable articles`);
 
-    // Spread picks across the result set for topic diversity
-    const step = Math.max(1, Math.floor(articles.length / count));
+    // Pick up to `count` articles, max one per domain for source diversity
+    const seenDomains = new Set();
     const recs = [];
-    for (let i = 0; i < articles.length && recs.length < count; i += step) {
-      recs.push({ title: articles[i].title, url: articles[i].url });
+    for (const article of articles) {
+      if (recs.length >= count) break;
+      try {
+        const domain = new URL(article.url).hostname.replace(/^www\./, '');
+        if (seenDomains.has(domain)) continue;
+        seenDomains.add(domain);
+        recs.push({ title: article.title, url: article.url });
+      } catch {
+        // Skip malformed URLs
+      }
     }
 
     console.log(`✅ Selected ${recs.length} recommendations from NewsAPI`);
