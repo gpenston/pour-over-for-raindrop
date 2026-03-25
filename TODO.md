@@ -1,4 +1,4 @@
-# Raindrop Digest - TODO
+# Pour Over for Raindrop - TODO
 *Personal project - prioritized for solo use & GitHub Actions deployment*
 
 ---
@@ -159,7 +159,7 @@ The script is now production-ready with:
    - `SMTP_PASS`
    - `FROM_EMAIL`
    - `TO_EMAIL`
-3. **Test manually** from Actions tab → "Daily Raindrop Digest" → "Run workflow"
+3. **Test manually** from Actions tab → "Pour Over for Raindrop" → "Run workflow"
 4. **Check your email!** 📧
 
 ### **Or Test Locally First:**

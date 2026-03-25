@@ -1,4 +1,4 @@
-// raindrop-digest.js
+// pour-over.js
 import dotenv from 'dotenv';
 import axios from 'axios';
 import nodemailer from 'nodemailer';

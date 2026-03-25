@@ -1,4 +1,4 @@
-name: Raindrop Digest
+name: Pour Over for Raindrop
 
 on:
   schedule:
@@ -9,7 +9,7 @@ on:
 jobs:
   send-digest:
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -34,4 +34,4 @@ jobs:
           SMTP_PASS: ${{ secrets.SMTP_PASS }}
           FROM_EMAIL: ${{ secrets.FROM_EMAIL }}
           TO_EMAIL: ${{ secrets.TO_EMAIL }}
-        run: node raindrop-digest.js
+        run: node pour-over.js

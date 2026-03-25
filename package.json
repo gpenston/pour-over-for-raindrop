@@ -1,11 +1,11 @@
 {
-  "name": "raindrop-digest",
+  "name": "pour-over-for-raindrop",
   "version": "1.0.0",
-  "description": "Daily email digest from Raindrop.io with summaries and formatting",
+  "description": "Your read later bookmarks, brewed fresh and delivered to your inbox.",
   "type": "module",
-  "main": "raindrop-digest.js",
+  "main": "pour-over.js",
   "scripts": {
-    "start": "node raindrop-digest.js"
+    "start": "node pour-over.js"
   },
   "dependencies": {
     "axios": "^1.6.8",

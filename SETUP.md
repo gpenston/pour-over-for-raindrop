@@ -27,7 +27,7 @@ npm --version   # Should show v10.x or higher
 
 ```bash
 # Navigate to project directory
-cd /Users/george/Projects/raindrop-digest
+cd /Users/george/Projects/pour-over-for-raindrop
 
 # Install dependencies
 npm install
@@ -75,7 +75,7 @@ npm start
 
 ### Making Changes
 
-1. Edit `raindrop-digest.js` locally using Cursor
+1. Edit `pour-over.js` locally using Cursor
 2. Test changes: `npm start`
 3. Commit and push to GitHub
 4. GitHub Actions will use the updated version
@@ -93,7 +93,7 @@ If something fails locally:
 If you want to preview the email HTML without sending:
 
 ```javascript
-// Temporarily comment out in raindrop-digest.js:
+// Temporarily comment out in pour-over.js:
 // await sendEmail(html);
 
 // Add this instead:
@@ -125,7 +125,7 @@ Then open `preview.html` in your browser to see what the email looks like.
 
 After pushing your changes:
 1. Go to Actions tab in GitHub
-2. Select "Daily Raindrop Digest"
+2. Select "Pour Over for Raindrop"
 3. Click "Run workflow" (manual trigger)
 4. Watch it run and check for errors
 
@@ -179,7 +179,7 @@ Now that you're set up:
 ## File Structure
 
 ```
-raindrop-digest/
+pour-over-for-raindrop/
 ├── .github/
 │   └── workflows/
 │       └── digest.yml        # GitHub Actions automation
@@ -188,7 +188,7 @@ raindrop-digest/
 ├── env.example               # Template for .env
 ├── package.json              # Dependencies
 ├── package-lock.json         # Locked dependency versions
-├── raindrop-digest.js        # Main script
+├── pour-over.js              # Main script
 ├── README.md                 # Project overview
 ├── TODO.md                   # Task list
 └── SETUP.md                  # This file

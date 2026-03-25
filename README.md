@@ -1,6 +1,6 @@
-# Raindrop Digest 📧
+# Pour Over for Raindrop ☕
 
-A daily email digest of your saved Raindrop.io bookmarks with clean formatting, dark/light mode support, and AI-powered article recommendations. Works as a GitHub Action for automated daily delivery or run locally.
+Your read later bookmarks, brewed fresh and delivered to your inbox. Clean formatting, dark/light mode support, and AI-powered article recommendations. Works as a GitHub Action for automated delivery or run locally.
 
 ## ✨ Features
 
@@ -38,14 +38,14 @@ Emails are styled to feel like a lightweight editorial newsletter:
    - `AI_PROVIDER` — (optional) `'openai'` or `'perplexity'` (defaults to `'openai'`)
 
 3. **Push to `main`** — GitHub Actions will automatically send you a daily digest
-4. **Manual trigger**: Go to Actions tab → "Daily Raindrop Digest" → "Run workflow"
+4. **Manual trigger**: Go to Actions tab → "Pour Over for Raindrop" → "Run workflow"
 
 ### Option 2: Local Development
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/yourusername/raindrop-digest.git
-   cd raindrop-digest
+   git clone https://github.com/yourusername/pour-over-for-raindrop.git
+   cd pour-over-for-raindrop
    ```
 
 2. **Install dependencies**
@@ -90,7 +90,7 @@ See [SETUP.md](./SETUP.md) for detailed local development instructions.
 
 ### Customization
 
-You can modify these constants in `raindrop-digest.js`:
+You can modify these constants in `pour-over.js`:
 
 - `MAX_ITEMS_TO_SHOW` (default: 7) — Number of recent items to include
 - `MIN_ITEMS_THRESHOLD` (default: 5) — Minimum items required to send digest
@@ -148,14 +148,14 @@ To change the schedule, edit `.github/workflows/digest.yml` and modify the cron 
 ## 📁 Project Structure
 
 ```
-raindrop-digest/
+pour-over-for-raindrop/
 ├── .github/
 │   └── workflows/
 │       └── digest.yml        # GitHub Actions automation
 ├── .env                      # Your secrets (gitignored)
 ├── env.example               # Template for .env
 ├── package.json              # Dependencies and scripts
-├── raindrop-digest.js        # Main script
+├── pour-over.js              # Main script
 ├── README.md                 # This file
 ├── SETUP.md                  # Detailed setup guide
 └── TODO.md                   # Development roadmap
@@ -182,7 +182,7 @@ npm start
 You can modify the script to save HTML to a file instead of sending:
 
 ```javascript
-// In raindrop-digest.js, comment out:
+// In pour-over.js, comment out:
 // await sendEmail(html);
 
 // Add instead:
