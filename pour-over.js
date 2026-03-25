@@ -21,9 +21,6 @@ const COLLECTION_ID   = process.env.COLLECTION_ID;
 const ARCHIVE_ID      = process.env.ARCHIVE_ID;
 const RAINDROP_TOKEN  = process.env.RAINDROP_TOKEN;
 const NEWS_API_KEY    = process.env.NEWS_API_KEY;
-const OPENAI_API_KEY  = process.env.OPENAI_API_KEY;
-const PERPLEXITY_API_KEY = process.env.PERPLEXITY_API_KEY;
-const AI_PROVIDER     = process.env.AI_PROVIDER || 'openai'; // 'openai' or 'perplexity'
 const SMTP_HOST       = process.env.SMTP_HOST || 'smtp.mail.me.com';
 const SMTP_PORT       = parseInt(process.env.SMTP_PORT || '587', 10);
 const SMTP_USER       = process.env.SMTP_USER;
@@ -115,57 +112,6 @@ function isListicle(title) {
   );
 }
 
-// Group similar tags together to avoid duplication and assign categories
-function groupSimilarTags(tags) {
-  const groups = [];
-  const used = new Set();
-  
-  // Define similar tag patterns with category labels
-  const similarities = {
-    'design': {
-      patterns: ['ux design', 'ui design', 'design'],
-      type: 'professional'
-    },
-    'ai': {
-      patterns: ['ai', 'AI', 'artificial intelligence', 'machine learning', 'technology'],
-      type: 'professional'
-    },
-    'improvement': {
-      patterns: ['self improvement', 'productivity', 'personal development'],
-      type: 'personal'
-    },
-    'leadership': {
-      patterns: ['leadership', 'management', 'career'],
-      type: 'professional'
-    },
-    'media': {
-      patterns: ['video games', 'gaming', 'role-playing', 'movies', 'film', 'tv', 'television', 'books', 'reading', 'literature'],
-      type: 'culture'
-    }
-  };
-  
-  // First pass: group similar tags with category info
-  for (const [key, config] of Object.entries(similarities)) {
-    const matchedTags = tags.filter(tag => 
-      config.patterns.some(p => tag.toLowerCase().includes(p.toLowerCase())) && !used.has(tag)
-    );
-    if (matchedTags.length > 0) {
-      groups.push({ tags: matchedTags, category: key, type: config.type });
-      matchedTags.forEach(t => used.add(t));
-    }
-  }
-  
-  // Second pass: add remaining ungrouped tags individually
-  tags.forEach(tag => {
-    if (!used.has(tag)) {
-      groups.push({ tags: [tag], category: 'other', type: 'general' });
-      used.add(tag);
-    }
-  });
-  
-  return groups;
-}
-
 // Fetch recommendations from NewsAPI using batched tag query (1 request per run)
 async function getNewsRecommendations(tags, savedUrls = [], count = RECOMMENDATIONS_COUNT) {
   if (!NEWS_API_KEY) return null; // null = not configured, not a failure
@@ -211,157 +157,6 @@ async function getNewsRecommendations(tags, savedUrls = [], count = RECOMMENDATI
     console.warn(`⚠️ NewsAPI failed: ${e.message}`);
     return null; // Trigger fallback to AI provider
   }
-}
-
-// Ask AI for recommendations with tag diversity, fallback on error
-async function getRecommendations(tags, recentTitles, count = RECOMMENDATIONS_COUNT) {
-  console.log(`💡 Generating ${count} recommendations from ${tags.length} tags`);
-  
-  // Determine which AI provider to use
-  const usePerplexity = AI_PROVIDER === 'perplexity' || (PERPLEXITY_API_KEY && !OPENAI_API_KEY);
-  
-  if (usePerplexity && !PERPLEXITY_API_KEY) {
-    console.warn('⚠️ Perplexity selected but no API key provided');
-    return [];
-  }
-  
-  if (!usePerplexity && !OPENAI_API_KEY) {
-    console.warn('⚠️ OpenAI selected but no API key provided');
-    return [];
-  }
-  
-  // Group similar tags to avoid clustering
-  const tagGroups = groupSimilarTags(tags);
-  console.log(`📊 Split into ${tagGroups.length} tag groups for diversity`);
-  
-  // Select tag groups to use (up to count)
-  const selectedGroups = tagGroups.slice(0, count);
-  
-  // Build context string from recent article titles
-  const contextStr = recentTitles && recentTitles.length > 0
-    ? `\n\nRecent articles I've saved: "${recentTitles.slice(0, 8).join('"; "')}"`
-    : '';
-  
-  const apiConfig = usePerplexity ? {
-    url: 'https://api.perplexity.ai/chat/completions',
-    key: PERPLEXITY_API_KEY,
-    model: 'sonar-pro',
-    name: 'Perplexity'
-  } : {
-    url: 'https://api.openai.com/v1/chat/completions',
-    key: OPENAI_API_KEY,
-    model: 'gpt-4o-mini',
-    name: 'OpenAI'
-  };
-  
-  console.log(`🤖 Using ${apiConfig.name} for recommendations`);
-  
-  // Make separate requests for each tag group to force diversity
-  const allRecs = [];
-  
-  for (let i = 0; i < selectedGroups.length; i++) {
-    const group = selectedGroups[i];
-    const groupTags = group.tags.join(', ');
-    const category = group.category;
-    console.log(`   📌 Group ${i + 1}: ${groupTags} [${category}]`);
-    
-    // Create category-specific prompts to avoid listicles
-    let contentType, avoidContent;
-    
-    if (category === 'media') {
-      contentType = 'thoughtful essays, cultural criticism, in-depth reviews, or personal reflections about games, movies, TV shows, or books';
-      avoidContent = 'industry news, statistics, revenue reports, "Top X" lists, or trend predictions';
-    } else if (category === 'improvement' || category === 'leadership') {
-      contentType = 'personal essays, research-backed analyses, first-person narratives, or deep-dive explorations';
-      avoidContent = '"X strategies", "Y tips", numbered lists, or generic advice compilations';
-    } else {
-      contentType = 'case studies, technical deep-dives, research papers, or thought-provoking essays';
-      avoidContent = 'trend forecasts, "Top X" lists, prediction pieces, or numbered tip lists';
-    }
-    
-    const prompt = usePerplexity 
-      ? `You are a helpful recommendation engine with web search capabilities. ` +
-        `Find 1 substantive, thought-provoking article about: ${groupTags}.${contextStr}\n\n` +
-        `Requirements:\n` +
-        `- Published in last 3-6 months\n` +
-        `- Prefer: ${contentType}\n` +
-        `- AVOID: ${avoidContent}\n` +
-        `- Must have depth and originality, not surface-level content\n\n` +
-        `Respond with a JSON array with exactly 1 object having "title" and "url" fields. Only return the JSON.`
-      : `Find 1 high-quality recent article about: ${groupTags}.${contextStr}\n` +
-        `Respond with a JSON array with 1 object having "title" and "url" fields.`;
-    
-    try {
-      let rec = null;
-      let attempts = 0;
-      const maxAttempts = 2;
-      
-      while (!rec && attempts < maxAttempts) {
-        attempts++;
-        
-        // Use stricter prompt on retry
-        const retryPrompt = attempts > 1 ? prompt.replace(
-          'Find 1 substantive',
-          'Find 1 substantive article. DO NOT return any article with "Top", "Best", or numbered lists in the title. Find 1 substantive'
-        ) : prompt;
-        
-        const candidate = await retryWithBackoff(async () => {
-          const res = await axios.post(
-            apiConfig.url,
-            {
-              model: apiConfig.model,
-              messages: [
-                { role: 'system', content: 'You are a helpful recommendation engine.' },
-                { role: 'user', content: retryPrompt }
-              ],
-              temperature: 0.7,
-              max_tokens: 500
-            },
-            { headers: { Authorization: `Bearer ${apiConfig.key}` } }
-          );
-          
-          let text = res.data.choices[0].message.content.trim();
-          
-          // Handle markdown code blocks
-          const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-          if (jsonMatch) {
-            text = jsonMatch[1];
-          }
-          
-          const parsed = JSON.parse(text);
-          
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            return parsed[0]; // Take first recommendation
-          } else if (parsed.title && parsed.url) {
-            return parsed; // Single object response
-          }
-          
-          return null;
-        }, `${apiConfig.name} API (group ${i + 1}, attempt ${attempts})`);
-        
-        if (candidate && candidate.title) {
-          if (isListicle(candidate.title) && attempts < maxAttempts) {
-            console.warn(`   ⚠️ Rejected listicle: "${candidate.title}", retrying...`);
-            continue; // Try again
-          }
-          
-          rec = candidate;
-        } else {
-          break; // No valid candidate, stop trying
-        }
-      }
-      
-      if (rec) {
-        allRecs.push(rec);
-      }
-    } catch (e) {
-      console.warn(`⚠️ Failed to get recommendation for "${groupTags}": ${e.message}`);
-      // Continue with other groups
-    }
-  }
-  
-  console.log(`✅ Generated ${allRecs.length} diverse recommendations from ${apiConfig.name}`);
-  return allRecs;
 }
 
 // Build HTML email
@@ -478,8 +273,7 @@ async function sendEmail(html) {
   try {
     validateEnv();
     
-    const recSource = NEWS_API_KEY ? 'NewsAPI' : (PERPLEXITY_API_KEY ? 'Perplexity' : (OPENAI_API_KEY ? 'OpenAI' : 'None'));
-    console.log('🔑 CONFIG:', { COLLECTION_ID, ARCHIVE_ID, REC_SOURCE: recSource });
+    console.log('🔑 CONFIG:', { COLLECTION_ID, ARCHIVE_ID, REC_SOURCE: NEWS_API_KEY ? 'NewsAPI' : 'None' });
     
     const saved = await getRaindropItems(COLLECTION_ID);
     
@@ -492,7 +286,7 @@ async function sendEmail(html) {
     console.log(`📋 Selected ${latest.length} items for digest`);
 
     let recs = [];
-    if (ARCHIVE_ID && (NEWS_API_KEY || OPENAI_API_KEY || PERPLEXITY_API_KEY)) {
+    if (ARCHIVE_ID && NEWS_API_KEY) {
       console.log(`🔍 Fetching archive items from ${ARCHIVE_ID}…`);
       const archive = await getRaindropItems(ARCHIVE_ID, ARCHIVE_FETCH_LIMIT);
 
@@ -525,31 +319,17 @@ async function sendEmail(html) {
 
       console.log('🔝 Top tags (weighted, filtered):', topTags);
 
-      // Try NewsAPI first (real URLs, free, 1 request per run)
-      if (NEWS_API_KEY) {
-        const savedUrls = saved.map(it => it.link).filter(Boolean);
-        const newsRecs = await getNewsRecommendations(topTags, savedUrls);
-        if (newsRecs && newsRecs.length > 0) {
-          recs = newsRecs;
-        } else if (newsRecs === null) {
-          console.log('⬇️ NewsAPI failed, falling back to AI provider…');
-        } else {
-          console.warn('⚠️ NewsAPI returned no results');
-        }
-      }
-
-      // AI provider fallback (or primary if NEWS_API_KEY not set)
-      if (recs.length === 0 && (OPENAI_API_KEY || PERPLEXITY_API_KEY)) {
-        const recentTitles = saved.slice(0, 10).map(it => it.title);
-        console.log(`📖 Using ${recentTitles.length} recent article titles for AI context`);
-        recs = await getRecommendations(topTags, recentTitles);
-      }
-
-      if (recs.length === 0) {
-        console.warn('⚠️ No recommendations generated from any provider');
+      const savedUrls = saved.map(it => it.link).filter(Boolean);
+      const newsRecs = await getNewsRecommendations(topTags, savedUrls);
+      if (newsRecs && newsRecs.length > 0) {
+        recs = newsRecs;
+      } else if (newsRecs === null) {
+        console.warn('⚠️ NewsAPI failed');
+      } else {
+        console.warn('⚠️ NewsAPI returned no results');
       }
     } else {
-      console.warn('⚠️ ARCHIVE_ID or recommendation API key missing; skipping recommendations');
+      console.warn('⚠️ ARCHIVE_ID or NEWS_API_KEY missing; skipping recommendations');
     }
 
     const html = buildEmailHtml(latest, recs);

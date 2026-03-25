@@ -5,7 +5,7 @@ Your read later bookmarks, brewed fresh and delivered to your inbox. Clean forma
 ## ✨ Features
 
 - **📚 Recent Bookmarks**: Pulls up to 7 of your most recent "Read Later" saves
-- **🤖 Smart Recommendations**: NewsAPI-powered article recommendations based on your archive tags (with AI fallback via OpenAI or Perplexity)
+- **🤖 Smart Recommendations**: NewsAPI-powered article recommendations based on your archive tags
 - **🎨 Beautiful Emails**: Responsive email layout with native dark mode support
 - **📱 Mobile Friendly**: Optimized for both macOS Mail and iOS Mail
 - **🔄 Fully Automated**: Runs on a configurable schedule via GitHub Actions (or manually)
@@ -35,8 +35,6 @@ Emails are styled to feel like a lightweight editorial newsletter:
    - `TO_EMAIL` — Where to send the digest
    - `FROM_EMAIL` — From address (usually same as SMTP_USER)
    - `NEWS_API_KEY` — (optional, recommended) Free key from [newsapi.org](https://newsapi.org/register) for article recommendations
-   - `PERPLEXITY_API_KEY` or `OPENAI_API_KEY` — (optional) AI fallback for recommendations if NewsAPI isn't set
-   - `AI_PROVIDER` — (optional) `'openai'` or `'perplexity'` (defaults to `'openai'`)
 
    > **Note:** The default SMTP configuration uses iCloud Mail (`smtp.mail.me.com`). To use Gmail, Outlook, or another provider, also set `SMTP_HOST` and `SMTP_PORT` secrets. See [Email Providers](#-email-providers) below.
 
@@ -87,10 +85,7 @@ See [SETUP.md](./SETUP.md) for detailed local development instructions.
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `ARCHIVE_ID` | Archive collection ID for tag-based recommendations | None |
-| `NEWS_API_KEY` | NewsAPI key — primary recommendation source (free at [newsapi.org](https://newsapi.org)) | None |
-| `OPENAI_API_KEY` | OpenAI API key — fallback if `NEWS_API_KEY` not set | None |
-| `PERPLEXITY_API_KEY` | Perplexity API key — fallback if `NEWS_API_KEY` not set | None |
-| `AI_PROVIDER` | AI fallback provider: `'openai'` or `'perplexity'` | `'openai'` |
+| `NEWS_API_KEY` | NewsAPI key for recommendations (free at [newsapi.org](https://newsapi.org)) | None |
 | `SMTP_HOST` | SMTP server hostname | `smtp.mail.me.com` (iCloud) |
 | `SMTP_PORT` | SMTP server port | `587` |
 
@@ -118,7 +113,7 @@ To change the schedule, edit `.github/workflows/digest.yml` and modify the cron 
 
 1. **Fetches Recent Bookmarks**: Retrieves your most recent "Read Later" items from Raindrop.io
 2. **Analyzes Tags**: (Optional) If `ARCHIVE_ID` is set, analyzes tags from both Read Later and Archive collections
-3. **Generates Recommendations**: (Optional) Finds related articles via NewsAPI (primary) or AI providers (fallback)
+3. **Generates Recommendations**: (Optional) Finds related articles via NewsAPI based on your top tags
 4. **Builds Email**: Creates a beautifully formatted HTML email with all content
 5. **Sends Digest**: Delivers the email via SMTP
 
@@ -140,11 +135,10 @@ To change the schedule, edit `.github/workflows/digest.yml` and modify the cron 
 
 ### Recommendations Not Working
 
-- Ensure `ARCHIVE_ID` is set — recommendations are based on your archive tags
-- For NewsAPI (recommended, free): set `NEWS_API_KEY` from [newsapi.org](https://newsapi.org/register)
-- For AI fallback: set `OPENAI_API_KEY` or `PERPLEXITY_API_KEY` and optionally `AI_PROVIDER`
-- Check API key validity and billing status
-- The script will gracefully skip recommendations if all providers fail
+- Ensure both `ARCHIVE_ID` and `NEWS_API_KEY` are set
+- Recommendations are based on your archive tags — no archive collection means no recommendations
+- Get a free NewsAPI key at [newsapi.org](https://newsapi.org/register)
+- The script will gracefully skip recommendations if NewsAPI fails
 
 ### GitHub Actions Failing
 
@@ -223,7 +217,6 @@ This project is for personal use. Feel free to fork and modify for your own need
 
 - [Raindrop.io](https://raindrop.io/) for the bookmarking API
 - [NewsAPI](https://newsapi.org/) for article recommendations
-- [OpenAI](https://openai.com/) and [Perplexity](https://www.perplexity.ai/) for AI recommendation fallback
 - Built with Node.js, Axios, Nodemailer, and Day.js
 
 ---

@@ -31,9 +31,6 @@ jobs:
           ARCHIVE_ID: ${{ secrets.ARCHIVE_ID }}
           RAINDROP_TOKEN: ${{ secrets.RAINDROP_TOKEN }}
           NEWS_API_KEY: ${{ secrets.NEWSAPI_KEY }}
-          PERPLEXITY_API_KEY: ${{ secrets.PERPLEXITY_API_KEY }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          AI_PROVIDER: ${{ secrets.AI_PROVIDER }}
           SMTP_HOST: ${{ secrets.SMTP_HOST }}
           SMTP_PORT: ${{ secrets.SMTP_PORT }}
           SMTP_USER: ${{ secrets.SMTP_USER }}

@@ -59,10 +59,7 @@ open -a TextEdit .env
 
 **Optional values:**
 - `ARCHIVE_ID` - Another collection for recommendation tags
-- `NEWS_API_KEY` - Free key from https://newsapi.org/register (recommended for article recommendations)
-- `OPENAI_API_KEY` - AI fallback for recommendations if NEWS_API_KEY is not set
-- `PERPLEXITY_API_KEY` - AI fallback for recommendations if NEWS_API_KEY is not set
-- `AI_PROVIDER` - Which AI fallback to use: `openai` or `perplexity` (default: `openai`)
+- `NEWS_API_KEY` - Free key from https://newsapi.org/register for article recommendations
 - `SMTP_HOST` - SMTP server hostname (default: `smtp.mail.me.com` for iCloud)
 - `SMTP_PORT` - SMTP server port (default: `587`)
 
@@ -136,9 +133,6 @@ Then open `preview.html` in your browser to see what the email looks like.
    - `COLLECTION_ID`
    - `ARCHIVE_ID` (optional)
    - `NEWSAPI_KEY` (optional, recommended)
-   - `OPENAI_API_KEY` (optional)
-   - `PERPLEXITY_API_KEY` (optional)
-   - `AI_PROVIDER` (optional)
    - `SMTP_USER`
    - `SMTP_PASS`
    - `FROM_EMAIL`
@@ -186,9 +180,8 @@ Use [crontab.guru](https://crontab.guru/) to build your own schedule.
 - Test with: `npm start` and check console output
 
 ### Recommendations not showing
-- Ensure `ARCHIVE_ID` is set — recommendations are based on archive tags
-- Set `NEWS_API_KEY` (free from [newsapi.org](https://newsapi.org/register)) for best results
-- Or set `OPENAI_API_KEY` / `PERPLEXITY_API_KEY` as an AI fallback
+- Ensure both `ARCHIVE_ID` and `NEWS_API_KEY` are set
+- Get a free key at [newsapi.org](https://newsapi.org/register)
 
 ### No items to send
 - Script requires >5 items in your Read Later collection
