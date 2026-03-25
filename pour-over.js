@@ -189,7 +189,7 @@ async function getNewsRecommendations(tags, savedUrls = [], count = RECOMMENDATI
         params: {
           q: query,
           sortBy: 'relevancy',
-          pageSize: 25,
+          pageSize: 100,
           language: 'en',
           apiKey: NEWS_API_KEY,
         }
