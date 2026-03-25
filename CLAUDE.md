@@ -3,10 +3,10 @@
 ## Project Overview
 
 **Name**: Raindrop Digest
-**Owner**: George Penston (gpenston@gmail.com)
-**Type**: Personal automation project
+**Author**: George Penston
+**Type**: Open-source automation tool
 **Repository**: https://github.com/gpenston/raindrop-digest
-**Status**: Production, actively running via GitHub Actions
+**License**: MIT
 
 A Node.js script that sends a beautifully formatted email digest of Raindrop.io bookmarks with AI-powered article recommendations. Runs automatically via GitHub Actions on a schedule.
 
@@ -64,7 +64,7 @@ RETRY_DELAY_MS = 1000          // Initial retry delay (doubles each attempt)
 - **Raindrop.io API** - Fetches bookmarks from collections
 - **Perplexity API** (primary) - `sonar-pro` model with web search
 - **OpenAI API** (fallback) - `gpt-4o-mini` model
-- **iCloud SMTP** - `smtp.mail.me.com:587` for email delivery
+- **SMTP** - Configurable (defaults to iCloud)
 
 ## Configuration
 
@@ -87,10 +87,9 @@ RETRY_DELAY_MS = 1000          // Initial retry delay (doubles each attempt)
 | `PERPLEXITY_API_KEY` | Perplexity API key | None |
 | `OPENAI_API_KEY` | OpenAI API key | None |
 | `AI_PROVIDER` | `'perplexity'` or `'openai'` | `'openai'` |
-
-### Personal Collection IDs
-- **Read Later**: 49504400
-- **Archive**: 45122018
+| `SMTP_HOST` | SMTP server hostname | `'smtp.mail.me.com'` |
+| `SMTP_PORT` | SMTP port | `587` |
+| `SMTP_SECURE` | Use TLS | `'false'` |
 
 ## GitHub Actions
 
@@ -209,16 +208,13 @@ raindrop-digest/
 
 When working on this project:
 
-1. **Personal project** - Built for George's daily use, not public distribution
-2. **Reliability over features** - Must work consistently every scheduled run
-3. **Simplicity valued** - Avoid over-engineering; it's one 500-line file by design
-4. **Email quality matters** - George reads these daily; formatting is important
-5. **Substantive recommendations** - Avoid clickbait; prefer deep, thoughtful content
-6. **Production-ready** - The code works; suggest improvements, not fixes
-7. **Git identity** - Use gpenston@gmail.com for any git operations
+1. **Reliability over features** - Must work consistently every scheduled run
+2. **Simplicity valued** - Avoid over-engineering; it's one 500-line file by design
+3. **Email quality matters** - Formatting is important for daily reading
+4. **Substantive recommendations** - Avoid clickbait; prefer deep, thoughtful content
+5. **Production-ready** - The code works; suggest improvements, not fixes
 
 ### What NOT to Do
-- Don't add tests (overhead not worth it for personal project)
 - Don't split into multiple files (single-file simplicity is intentional)
 - Don't add TypeScript (plain JS is fine for this scale)
 - Don't add complex abstractions for one-time operations

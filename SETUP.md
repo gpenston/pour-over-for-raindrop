@@ -53,15 +53,18 @@ open -a TextEdit .env
 - `RAINDROP_TOKEN` - Get from https://app.raindrop.io/settings/integrations
 - `COLLECTION_ID` - Find in URL: https://app.raindrop.io/my/[THIS_NUMBER]
 - `SMTP_USER` - Your email address (login for your SMTP provider)
-- `SMTP_PASS` - App-specific password for your email provider
+- `SMTP_PASS` - App-specific password (see env.example for provider-specific instructions)
 - `FROM_EMAIL` - Same as SMTP_USER
 - `TO_EMAIL` - Where to send the digest
 
 **Optional values:**
+- `SMTP_HOST` - SMTP server (defaults to iCloud: smtp.mail.me.com)
+- `SMTP_PORT` - SMTP port (defaults to 587)
 - `ARCHIVE_ID` - Another collection for recommendation tags
 - `NEWS_API_KEY` - Free key from https://newsapi.org/register for article recommendations
 - `SMTP_HOST` - SMTP server hostname (default: `smtp.mail.me.com` for iCloud)
 - `SMTP_PORT` - SMTP server port (default: `587`)
+- `SMTP_SECURE` - Use TLS, set to `true` for port 465 (default: `false`)
 
 ### 4. Test Locally
 
