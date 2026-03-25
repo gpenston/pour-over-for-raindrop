@@ -174,59 +174,65 @@ function isListicle(title) {
   );
 }
 
-// Fetch recommendations from NewsAPI using batched tag query (1 request per run)
+// Fetch one recommendation from NewsAPI for a single tag
+async function fetchOneRecForTag(tag, seenUrls, seenDomains) {
+  const response = await retryWithBackoff(async () =>
+    axios.get('https://newsapi.org/v2/everything', {
+      params: {
+        q: tag,
+        sortBy: 'relevancy',
+        pageSize: 20,
+        language: 'en',
+        apiKey: NEWS_API_KEY,
+      }
+    }), `NewsAPI (${tag})`
+  );
+
+  const articles = response.data.articles || [];
+  for (const a of articles) {
+    if (!a.url || !a.title || a.title === '[Removed]') continue;
+    if (seenUrls.has(a.url)) continue;
+    if (isListicle(a.title)) continue;
+    try {
+      const domain = new URL(a.url).hostname.replace(/^www\./, '');
+      if (seenDomains.has(domain)) continue;
+      return { title: a.title, url: a.url, tag, domain };
+    } catch {
+      // Skip malformed URLs
+    }
+  }
+  return null; // Nothing usable for this tag
+}
+
+// Fetch recommendations from NewsAPI — one query per tag for topic diversity
 async function getNewsRecommendations(tags, savedUrls = [], count = RECOMMENDATIONS_COUNT) {
   if (!NEWS_API_KEY) return null; // null = not configured, not a failure
 
-  console.log(`📰 Fetching recommendations from NewsAPI for tags: ${tags.slice(0, 8).join(', ')}`);
+  console.log(`📰 Fetching recommendations from NewsAPI (one query per tag): ${tags.slice(0, count).join(', ')}`);
 
-  // Batch all tags into a single OR query — stays well under the 100 req/day free limit
-  const query = tags.slice(0, 8).join(' OR ');
+  const seenUrls  = new Set(savedUrls);
+  const seenDomains = new Set();
+  const recs = [];
 
-  try {
-    const response = await retryWithBackoff(async () =>
-      axios.get('https://newsapi.org/v2/everything', {
-        params: {
-          q: query,
-          sortBy: 'relevancy',
-          pageSize: 100,
-          language: 'en',
-          apiKey: NEWS_API_KEY,
-        }
-      }), 'NewsAPI'
-    );
-
-    const articles = (response.data.articles || []).filter(a =>
-      a.url &&
-      a.title &&
-      a.title !== '[Removed]' &&
-      !savedUrls.includes(a.url) &&
-      !isListicle(a.title)
-    );
-
-    console.log(`📰 NewsAPI returned ${articles.length} usable articles`);
-
-    // Pick up to `count` articles, max one per domain for source diversity
-    const seenDomains = new Set();
-    const recs = [];
-    for (const article of articles) {
-      if (recs.length >= count) break;
-      try {
-        const domain = new URL(article.url).hostname.replace(/^www\./, '');
-        if (seenDomains.has(domain)) continue;
-        seenDomains.add(domain);
-        recs.push({ title: article.title, url: article.url });
-      } catch {
-        // Skip malformed URLs
+  for (const tag of tags.slice(0, count * 2)) { // Extra tags as fallback if some return nothing
+    if (recs.length >= count) break;
+    try {
+      const rec = await fetchOneRecForTag(tag, seenUrls, seenDomains);
+      if (rec) {
+        seenUrls.add(rec.url);
+        seenDomains.add(rec.domain);
+        recs.push({ title: rec.title, url: rec.url, tag: rec.tag });
+        console.log(`  ✓ [${rec.tag}] ${rec.domain}`);
+      } else {
+        console.log(`  – [${tag}] no usable result`);
       }
+    } catch (e) {
+      console.warn(`⚠️ NewsAPI failed for tag "${tag}": ${e.message}`);
     }
-
-    console.log(`✅ Selected ${recs.length} recommendations from NewsAPI`);
-    return recs; // Empty array = configured but no results; null = failed/unconfigured
-  } catch (e) {
-    console.warn(`⚠️ NewsAPI failed: ${e.message}`);
-    return null; // Trigger fallback to AI provider
   }
+
+  console.log(`✅ Selected ${recs.length} recommendations from NewsAPI`);
+  return recs; // Empty array = configured but no results; null = failed/unconfigured
 }
 
 // Build HTML email
