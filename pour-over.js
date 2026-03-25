@@ -394,7 +394,7 @@ function buildEmailHtml(items, recs = []) {
     : '';
 
   const signOff = '<p style="font-size:.9rem;color:#555;margin-top:1.5rem">Thanks for reading — happy bookmarking! ✨</p>';
-  return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="color-scheme" content="light dark"><meta name="supported-color-schemes" content="light dark">${styles}</head><body><h1>Your Read Later Digest</h1>${mainHtml}${recHtml}${signOff}</body></html>`;
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="color-scheme" content="light dark"><meta name="supported-color-schemes" content="light dark">${styles}</head><body><h1>Your Pour Over Digest</h1>${mainHtml}${recHtml}${signOff}</body></html>`;
 }
 
 // Send via iCloud SMTP
@@ -413,7 +413,7 @@ async function sendEmail(html) {
     await transporter.sendMail({
       from: FROM_EMAIL,
       to:   TO_EMAIL,
-      subject: `Your Read Later Digest — ${dayjs().format('MMM D, YYYY')}`,
+      subject: `Your Pour Over Digest — ${dayjs().format('MMM D, YYYY')}`,
       html
     });
     
