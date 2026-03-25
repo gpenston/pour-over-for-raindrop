@@ -6,6 +6,9 @@ on:
     - cron: '0 15 * * 0'
   workflow_dispatch: # Allows manual trigger from GitHub Actions tab
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   send-digest:
     runs-on: ubuntu-latest
