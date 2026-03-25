@@ -23,6 +23,7 @@ const RAINDROP_TOKEN  = process.env.RAINDROP_TOKEN;
 const NEWS_API_KEY    = process.env.NEWS_API_KEY;
 const DIGEST_SCHEDULE = (process.env.DIGEST_SCHEDULE || 'weekly').toLowerCase().trim();
 const DIGEST_TIME     = (process.env.DIGEST_TIME     || 'morning').toLowerCase().trim();
+const FORCE_SEND      = process.env.FORCE_SEND === 'true';
 const SMTP_HOST       = process.env.SMTP_HOST || 'smtp.mail.me.com';
 const SMTP_PORT       = parseInt(process.env.SMTP_PORT || '587', 10);
 const SMTP_SECURE     = process.env.SMTP_SECURE === 'true';
@@ -70,6 +71,11 @@ function validateEnv() {
 // Check if the digest should run now based on DIGEST_SCHEDULE and DIGEST_TIME
 // The workflow fires 3x/day (3, 15, 19 UTC); this function gates whether to actually send.
 function shouldRunNow() {
+  if (FORCE_SEND) {
+    console.log('🚀 Manual trigger — bypassing schedule check');
+    return true;
+  }
+
   const now = new Date();
   const utcHour = now.getUTCHours();
   const utcDay  = now.getUTCDay(); // 0=Sun … 6=Sat
