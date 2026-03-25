@@ -20,6 +20,7 @@ const RETRY_DELAY_MS = 1000; // Initial delay, doubles each retry
 const COLLECTION_ID   = process.env.COLLECTION_ID;
 const ARCHIVE_ID      = process.env.ARCHIVE_ID;
 const RAINDROP_TOKEN  = process.env.RAINDROP_TOKEN;
+const NEWS_API_KEY    = process.env.NEWS_API_KEY;
 const OPENAI_API_KEY  = process.env.OPENAI_API_KEY;
 const PERPLEXITY_API_KEY = process.env.PERPLEXITY_API_KEY;
 const AI_PROVIDER     = process.env.AI_PROVIDER || 'openai'; // 'openai' or 'perplexity'
@@ -102,6 +103,16 @@ async function getRaindropItems(collectionId, perpage = RAINDROP_ITEMS_PER_PAGE)
   }, `Raindrop API (collection ${collectionId})`);
 }
 
+// Detect listicle-style titles (e.g. "Top 10 Tips", "5 Ways to...")
+function isListicle(title) {
+  return (
+    /^(Top|Best)\s/i.test(title) ||
+    /^\d+\s+(Essential|Must|Key|Critical|Important|Powerful|Proven)/i.test(title) ||
+    /\d+\s+(Tips|Strategies|Ways|Things|Trends|Reasons|Steps|Lessons)/i.test(title) ||
+    /:\s*\d+\s+(Tips|Strategies|Ways|Things|Trends)/i.test(title)
+  );
+}
+
 // Group similar tags together to avoid duplication and assign categories
 function groupSimilarTags(tags) {
   const groups = [];
@@ -151,6 +162,53 @@ function groupSimilarTags(tags) {
   });
   
   return groups;
+}
+
+// Fetch recommendations from NewsAPI using batched tag query (1 request per run)
+async function getNewsRecommendations(tags, savedUrls = [], count = RECOMMENDATIONS_COUNT) {
+  if (!NEWS_API_KEY) return null; // null = not configured, not a failure
+
+  console.log(`📰 Fetching recommendations from NewsAPI for tags: ${tags.slice(0, 8).join(', ')}`);
+
+  // Batch all tags into a single OR query — stays well under the 100 req/day free limit
+  const query = tags.slice(0, 8).join(' OR ');
+
+  try {
+    const response = await retryWithBackoff(async () =>
+      axios.get('https://newsapi.org/v2/everything', {
+        params: {
+          q: query,
+          sortBy: 'relevancy',
+          pageSize: 25,
+          language: 'en',
+          apiKey: NEWS_API_KEY,
+        }
+      }), 'NewsAPI'
+    );
+
+    const articles = (response.data.articles || []).filter(a =>
+      a.url &&
+      a.title &&
+      a.title !== '[Removed]' &&
+      !savedUrls.includes(a.url) &&
+      !isListicle(a.title)
+    );
+
+    console.log(`📰 NewsAPI returned ${articles.length} usable articles`);
+
+    // Spread picks across the result set for topic diversity
+    const step = Math.max(1, Math.floor(articles.length / count));
+    const recs = [];
+    for (let i = 0; i < articles.length && recs.length < count; i += step) {
+      recs.push({ title: articles[i].title, url: articles[i].url });
+    }
+
+    console.log(`✅ Selected ${recs.length} recommendations from NewsAPI`);
+    return recs; // Empty array = configured but no results; null = failed/unconfigured
+  } catch (e) {
+    console.warn(`⚠️ NewsAPI failed: ${e.message}`);
+    return null; // Trigger fallback to AI provider
+  }
 }
 
 // Ask AI for recommendations with tag diversity, fallback on error
@@ -280,16 +338,8 @@ async function getRecommendations(tags, recentTitles, count = RECOMMENDATIONS_CO
         }, `${apiConfig.name} API (group ${i + 1}, attempt ${attempts})`);
         
         if (candidate && candidate.title) {
-          // Check for listicle patterns in title
-          const title = candidate.title;
-          const isListicle = 
-            /^(Top|Best)\s/i.test(title) || // Starts with "Top" or "Best"
-            /^\d+\s+(Essential|Must|Key|Critical|Important|Powerful|Proven)/i.test(title) || // "5 Essential/Must/etc"
-            /\d+\s+(Tips|Strategies|Ways|Things|Trends|Reasons|Steps|Lessons)/i.test(title) || // "X Tips/Strategies/etc"
-            /:\s*\d+\s+(Tips|Strategies|Ways|Things|Trends)/i.test(title); // Ends with ": 5 Tips"
-          
-          if (isListicle && attempts < maxAttempts) {
-            console.warn(`   ⚠️ Rejected listicle: "${title}", retrying...`);
+          if (isListicle(candidate.title) && attempts < maxAttempts) {
+            console.warn(`   ⚠️ Rejected listicle: "${candidate.title}", retrying...`);
             continue; // Try again
           }
           
@@ -426,8 +476,8 @@ async function sendEmail(html) {
   try {
     validateEnv();
     
-    const aiKey = PERPLEXITY_API_KEY ? 'Perplexity' : (OPENAI_API_KEY ? 'OpenAI' : 'None');
-    console.log('🔑 CONFIG:', { COLLECTION_ID, ARCHIVE_ID, AI_PROVIDER: aiKey });
+    const recSource = NEWS_API_KEY ? 'NewsAPI' : (PERPLEXITY_API_KEY ? 'Perplexity' : (OPENAI_API_KEY ? 'OpenAI' : 'None'));
+    console.log('🔑 CONFIG:', { COLLECTION_ID, ARCHIVE_ID, REC_SOURCE: recSource });
     
     const saved = await getRaindropItems(COLLECTION_ID);
     
@@ -440,27 +490,27 @@ async function sendEmail(html) {
     console.log(`📋 Selected ${latest.length} items for digest`);
 
     let recs = [];
-    if (ARCHIVE_ID && (OPENAI_API_KEY || PERPLEXITY_API_KEY)) {
+    if (ARCHIVE_ID && (NEWS_API_KEY || OPENAI_API_KEY || PERPLEXITY_API_KEY)) {
       console.log(`🔍 Fetching archive items from ${ARCHIVE_ID}…`);
       const archive = await getRaindropItems(ARCHIVE_ID, ARCHIVE_FETCH_LIMIT);
-      
+
       // Weight tags: Read Later (3x) + Archive (1x) to prioritize current interests
       const tagWeights = {};
-      
+
       // Add Read Later tags with 3x weight (current active interests)
       saved.forEach(it => {
         (it.tags || []).forEach(tag => {
           tagWeights[tag] = (tagWeights[tag] || 0) + 3;
         });
       });
-      
+
       // Add Archive tags with 1x weight (historical interests)
       archive.forEach(it => {
         (it.tags || []).forEach(tag => {
           tagWeights[tag] = (tagWeights[tag] || 0) + 1;
         });
       });
-      
+
       const topTags = Object.entries(tagWeights)
         .sort((a, b) => b[1] - a[1])
         .map(([tag]) => tag)
@@ -470,16 +520,34 @@ async function sendEmail(html) {
           return true;
         })
         .slice(0, TOP_TAGS_COUNT);
-      
+
       console.log('🔝 Top tags (weighted, filtered):', topTags);
-      
-      // Extract recent article titles for context
-      const recentTitles = saved.slice(0, 10).map(it => it.title);
-      console.log(`📖 Using ${recentTitles.length} recent article titles for context`);
-      
-      recs = await getRecommendations(topTags, recentTitles);
+
+      // Try NewsAPI first (real URLs, free, 1 request per run)
+      if (NEWS_API_KEY) {
+        const savedUrls = saved.map(it => it.link).filter(Boolean);
+        const newsRecs = await getNewsRecommendations(topTags, savedUrls);
+        if (newsRecs && newsRecs.length > 0) {
+          recs = newsRecs;
+        } else if (newsRecs === null) {
+          console.log('⬇️ NewsAPI failed, falling back to AI provider…');
+        } else {
+          console.warn('⚠️ NewsAPI returned no results');
+        }
+      }
+
+      // AI provider fallback (or primary if NEWS_API_KEY not set)
+      if (recs.length === 0 && (OPENAI_API_KEY || PERPLEXITY_API_KEY)) {
+        const recentTitles = saved.slice(0, 10).map(it => it.title);
+        console.log(`📖 Using ${recentTitles.length} recent article titles for AI context`);
+        recs = await getRecommendations(topTags, recentTitles);
+      }
+
+      if (recs.length === 0) {
+        console.warn('⚠️ No recommendations generated from any provider');
+      }
     } else {
-      console.warn('⚠️ ARCHIVE_ID or AI API key missing; skipping recommendations');
+      console.warn('⚠️ ARCHIVE_ID or recommendation API key missing; skipping recommendations');
     }
 
     const html = buildEmailHtml(latest, recs);

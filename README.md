@@ -84,9 +84,10 @@ See [SETUP.md](./SETUP.md) for detailed local development instructions.
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `ARCHIVE_ID` | Archive collection ID for recommendations | None |
-| `OPENAI_API_KEY` | OpenAI API key for recommendations | None |
-| `PERPLEXITY_API_KEY` | Perplexity API key for recommendations | None |
-| `AI_PROVIDER` | AI provider: `'openai'` or `'perplexity'` | `'openai'` |
+| `NEWS_API_KEY` | NewsAPI key for recommendations (free at [newsapi.org](https://newsapi.org)) | None |
+| `OPENAI_API_KEY` | OpenAI API key (fallback if `NEWS_API_KEY` not set) | None |
+| `PERPLEXITY_API_KEY` | Perplexity API key (fallback if `NEWS_API_KEY` not set) | None |
+| `AI_PROVIDER` | AI fallback provider: `'openai'` or `'perplexity'` | `'openai'` |
 
 ### Customization
 
