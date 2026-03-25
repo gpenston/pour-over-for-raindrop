@@ -205,7 +205,7 @@ By default, Pour Over uses **iCloud Mail**. To use a different provider, set `SM
 |----------|-------------|-------------|-------|
 | **iCloud** *(default)* | `smtp.mail.me.com` | `587` | Requires [app-specific password](https://appleid.apple.com/account/manage) |
 | **Gmail** | `smtp.gmail.com` | `587` | Requires [app password](https://myaccount.google.com/apppasswords) (2FA must be on) |
-| **Outlook / Hotmail** | `smtp-mail.outlook.com` | `587` | Use your full email as `SMTP_USER` |
+| **Outlook** | `smtp-mail.outlook.com` | `587` | Use your full email as `SMTP_USER` |
 | **Fastmail** | `smtp.fastmail.com` | `587` | Use your full email as `SMTP_USER` |
 
 > **Note:** Most providers require an app-specific password (not your regular login password). Check your email provider's security settings to generate one.
