@@ -24,6 +24,8 @@ const NEWS_API_KEY    = process.env.NEWS_API_KEY;
 const OPENAI_API_KEY  = process.env.OPENAI_API_KEY;
 const PERPLEXITY_API_KEY = process.env.PERPLEXITY_API_KEY;
 const AI_PROVIDER     = process.env.AI_PROVIDER || 'openai'; // 'openai' or 'perplexity'
+const SMTP_HOST       = process.env.SMTP_HOST || 'smtp.mail.me.com';
+const SMTP_PORT       = parseInt(process.env.SMTP_PORT || '587', 10);
 const SMTP_USER       = process.env.SMTP_USER;
 const SMTP_PASS       = process.env.SMTP_PASS;
 const FROM_EMAIL      = process.env.FROM_EMAIL;
@@ -447,13 +449,13 @@ function buildEmailHtml(items, recs = []) {
   return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="color-scheme" content="light dark"><meta name="supported-color-schemes" content="light dark">${styles}</head><body><h1>Your Pour Over Digest</h1>${mainHtml}${recHtml}${signOff}</body></html>`;
 }
 
-// Send via iCloud SMTP
+// Send via SMTP
 async function sendEmail(html) {
   return retryWithBackoff(async () => {
     const transporter = nodemailer.createTransport({
-      host: 'smtp.mail.me.com',
-      port: 587,
-      secure: false,
+      host: SMTP_HOST,
+      port: SMTP_PORT,
+      secure: SMTP_PORT === 465,
       auth: { user: SMTP_USER, pass: SMTP_PASS }
     });
     

@@ -5,10 +5,10 @@ Your read later bookmarks, brewed fresh and delivered to your inbox. Clean forma
 ## ✨ Features
 
 - **📚 Recent Bookmarks**: Pulls up to 7 of your most recent "Read Later" saves
-- **🤖 AI Recommendations**: GPT-4 or Perplexity-powered article recommendations based on your archive tags
+- **🤖 Smart Recommendations**: NewsAPI-powered article recommendations based on your archive tags (with AI fallback via OpenAI or Perplexity)
 - **🎨 Beautiful Emails**: Responsive email layout with native dark mode support
 - **📱 Mobile Friendly**: Optimized for both macOS Mail and iOS Mail
-- **🔄 Fully Automated**: Runs daily via GitHub Actions (or manually)
+- **🔄 Fully Automated**: Runs on a configurable schedule via GitHub Actions (or manually)
 - **🛡️ Robust Error Handling**: Retry logic with exponential backoff for API calls
 - **📊 Rich Metadata**: Includes favicons, cover images, excerpts, tags, and source information
 
@@ -30,14 +30,17 @@ Emails are styled to feel like a lightweight editorial newsletter:
    - `RAINDROP_TOKEN` — Get from [Raindrop.io Settings](https://app.raindrop.io/settings/integrations)
    - `COLLECTION_ID` — Find in your collection URL: `https://app.raindrop.io/my/{COLLECTION_ID}`
    - `ARCHIVE_ID` — (optional) ID of an archive collection for generating recommendations
-   - `SMTP_USER` — Your iCloud email address
-   - `SMTP_PASS` — iCloud app-specific password ([generate here](https://appleid.apple.com/account/manage))
+   - `SMTP_USER` — Your email address (login for your SMTP provider)
+   - `SMTP_PASS` — Your SMTP password or app-specific password
    - `TO_EMAIL` — Where to send the digest
-   - `FROM_EMAIL` — From address (same as SMTP_USER for iCloud)
-   - `PERPLEXITY_API_KEY` or `OPENAI_API_KEY` — (optional) For AI-powered recommendations
+   - `FROM_EMAIL` — From address (usually same as SMTP_USER)
+   - `NEWS_API_KEY` — (optional, recommended) Free key from [newsapi.org](https://newsapi.org/register) for article recommendations
+   - `PERPLEXITY_API_KEY` or `OPENAI_API_KEY` — (optional) AI fallback for recommendations if NewsAPI isn't set
    - `AI_PROVIDER` — (optional) `'openai'` or `'perplexity'` (defaults to `'openai'`)
 
-3. **Push to `main`** — GitHub Actions will automatically send you a daily digest
+   > **Note:** The default SMTP configuration uses iCloud Mail (`smtp.mail.me.com`). To use Gmail, Outlook, or another provider, also set `SMTP_HOST` and `SMTP_PORT` secrets. See [Email Providers](#-email-providers) below.
+
+3. **Push to `main`** — GitHub Actions will automatically run on the configured schedule
 4. **Manual trigger**: Go to Actions tab → "Pour Over for Raindrop" → "Run workflow"
 
 ### Option 2: Local Development
@@ -48,7 +51,7 @@ Emails are styled to feel like a lightweight editorial newsletter:
    cd pour-over-for-raindrop
    ```
 
-2. **Install dependencies**
+2. **Install dependencies** *(local testing only — not needed for GitHub Actions)*
    ```bash
    npm install
    ```
@@ -74,20 +77,22 @@ See [SETUP.md](./SETUP.md) for detailed local development instructions.
 |----------|-------------|-----------------|
 | `RAINDROP_TOKEN` | Raindrop.io API token | [Raindrop.io Settings](https://app.raindrop.io/settings/integrations) |
 | `COLLECTION_ID` | Your "Read Later" collection ID | URL: `https://app.raindrop.io/my/{COLLECTION_ID}` |
-| `SMTP_USER` | SMTP username (iCloud email) | Your @icloud.com address |
-| `SMTP_PASS` | SMTP app-specific password | [Apple ID Management](https://appleid.apple.com/account/manage) |
-| `FROM_EMAIL` | From email address | Same as SMTP_USER for iCloud |
+| `SMTP_USER` | SMTP login (your email address) | Your email provider |
+| `SMTP_PASS` | SMTP password or app-specific password | Your email provider |
+| `FROM_EMAIL` | From email address | Usually same as SMTP_USER |
 | `TO_EMAIL` | Recipient email address | Your email address |
 
 ### Optional Environment Variables
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `ARCHIVE_ID` | Archive collection ID for recommendations | None |
-| `NEWS_API_KEY` | NewsAPI key for recommendations (free at [newsapi.org](https://newsapi.org)) | None |
-| `OPENAI_API_KEY` | OpenAI API key (fallback if `NEWS_API_KEY` not set) | None |
-| `PERPLEXITY_API_KEY` | Perplexity API key (fallback if `NEWS_API_KEY` not set) | None |
+| `ARCHIVE_ID` | Archive collection ID for tag-based recommendations | None |
+| `NEWS_API_KEY` | NewsAPI key — primary recommendation source (free at [newsapi.org](https://newsapi.org)) | None |
+| `OPENAI_API_KEY` | OpenAI API key — fallback if `NEWS_API_KEY` not set | None |
+| `PERPLEXITY_API_KEY` | Perplexity API key — fallback if `NEWS_API_KEY` not set | None |
 | `AI_PROVIDER` | AI fallback provider: `'openai'` or `'perplexity'` | `'openai'` |
+| `SMTP_HOST` | SMTP server hostname | `smtp.mail.me.com` (iCloud) |
+| `SMTP_PORT` | SMTP server port | `587` |
 
 ### Customization
 
@@ -100,30 +105,31 @@ You can modify these constants in `pour-over.js`:
 
 ## 🕒 Schedule
 
-The GitHub Action runs daily at **8:00 AM Pacific Time** (11:00 AM Eastern, 15:00 UTC) via cron:
+The GitHub Action runs **every Sunday at 8:00 AM Pacific Time** (11:00 AM Eastern, 15:00 UTC) by default:
 
 ```yaml
 schedule:
-  - cron: '0 15 * * *'
+  - cron: '0 15 * * 0'
 ```
 
-To change the schedule, edit `.github/workflows/digest.yml` and modify the cron expression. Use [crontab.guru](https://crontab.guru/) to help create your schedule.
+To change the schedule, edit `.github/workflows/digest.yml` and modify the cron expression. Use [crontab.guru](https://crontab.guru/) to help create your schedule. For example, `'0 15 * * *'` would run daily.
 
 ## 🛠️ How It Works
 
 1. **Fetches Recent Bookmarks**: Retrieves your most recent "Read Later" items from Raindrop.io
 2. **Analyzes Tags**: (Optional) If `ARCHIVE_ID` is set, analyzes tags from both Read Later and Archive collections
-3. **Generates Recommendations**: (Optional) Uses AI to find relevant articles based on your interests
+3. **Generates Recommendations**: (Optional) Finds related articles via NewsAPI (primary) or AI providers (fallback)
 4. **Builds Email**: Creates a beautifully formatted HTML email with all content
-5. **Sends Digest**: Delivers the email via SMTP (iCloud Mail)
+5. **Sends Digest**: Delivers the email via SMTP
 
 ## 🔧 Troubleshooting
 
 ### Email Not Sending
 
 - Verify SMTP credentials in your `.env` file or GitHub secrets
-- Ensure you're using an app-specific password (not your regular iCloud password)
+- Many providers require an app-specific password rather than your regular account password
 - Check that `FROM_EMAIL` and `TO_EMAIL` are set correctly
+- If using a non-iCloud provider, make sure `SMTP_HOST` and `SMTP_PORT` are set correctly
 - Test SMTP connection: The script will verify the connection before sending
 
 ### No Items in Digest
@@ -134,10 +140,11 @@ To change the schedule, edit `.github/workflows/digest.yml` and modify the cron 
 
 ### Recommendations Not Working
 
-- Ensure either `OPENAI_API_KEY` or `PERPLEXITY_API_KEY` is set
-- Verify `ARCHIVE_ID` is set if you want tag-based recommendations
+- Ensure `ARCHIVE_ID` is set — recommendations are based on your archive tags
+- For NewsAPI (recommended, free): set `NEWS_API_KEY` from [newsapi.org](https://newsapi.org/register)
+- For AI fallback: set `OPENAI_API_KEY` or `PERPLEXITY_API_KEY` and optionally `AI_PROVIDER`
 - Check API key validity and billing status
-- The script will gracefully skip recommendations if APIs fail
+- The script will gracefully skip recommendations if all providers fail
 
 ### GitHub Actions Failing
 
@@ -145,6 +152,20 @@ To change the schedule, edit `.github/workflows/digest.yml` and modify the cron 
 - Check the Actions tab for detailed error logs
 - Test locally first: `npm start` to ensure code works
 - Ensure Node.js version in workflow matches your local version
+
+## 📨 Email Providers
+
+By default, Pour Over uses **iCloud Mail**. To use a different provider, set `SMTP_HOST` and `SMTP_PORT` in your `.env` file (local) or as GitHub secrets (Actions).
+
+| Provider | `SMTP_HOST` | `SMTP_PORT` | Notes |
+|----------|-------------|-------------|-------|
+| **iCloud** *(default)* | `smtp.mail.me.com` | `587` | Requires [app-specific password](https://appleid.apple.com/account/manage) |
+| **Gmail** | `smtp.gmail.com` | `587` | Requires [app password](https://myaccount.google.com/apppasswords) (2FA must be on) |
+| **Outlook / Hotmail** | `smtp-mail.outlook.com` | `587` | Use your full email as `SMTP_USER` |
+| **Yahoo Mail** | `smtp.mail.yahoo.com` | `587` | Requires [app password](https://login.yahoo.com/account/security) |
+| **Fastmail** | `smtp.fastmail.com` | `587` | Use your full email as `SMTP_USER` |
+
+> **Note:** Most providers require an app-specific password (not your regular login password). Check your email provider's security settings to generate one.
 
 ## 📁 Project Structure
 
@@ -166,8 +187,10 @@ pour-over-for-raindrop/
 
 ### Running Locally
 
+> **Note:** `npm install` is only required for local testing. GitHub Actions handles dependencies automatically.
+
 ```bash
-# Install dependencies
+# Install dependencies (local only)
 npm install
 
 # Copy environment template
@@ -199,7 +222,8 @@ This project is for personal use. Feel free to fork and modify for your own need
 ## 🙏 Acknowledgments
 
 - [Raindrop.io](https://raindrop.io/) for the bookmarking API
-- [OpenAI](https://openai.com/) and [Perplexity](https://www.perplexity.ai/) for AI recommendations
+- [NewsAPI](https://newsapi.org/) for article recommendations
+- [OpenAI](https://openai.com/) and [Perplexity](https://www.perplexity.ai/) for AI recommendation fallback
 - Built with Node.js, Axios, Nodemailer, and Day.js
 
 ---

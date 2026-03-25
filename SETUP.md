@@ -1,5 +1,7 @@
 # Local Development Setup
 
+> **Note:** `npm install` and a local `.env` file are only needed for local testing. GitHub Actions handles all of this automatically via repository secrets.
+
 ## Quick Start
 
 ### 1. Install Node.js
@@ -26,10 +28,11 @@ npm --version   # Should show v10.x or higher
 ### 2. Clone and Setup Project
 
 ```bash
-# Navigate to project directory
-cd /Users/george/Projects/pour-over-for-raindrop
+# Clone the repository
+git clone https://github.com/yourusername/pour-over-for-raindrop.git
+cd pour-over-for-raindrop
 
-# Install dependencies
+# Install dependencies (local testing only)
 npm install
 
 # This creates node_modules/ and package-lock.json
@@ -49,14 +52,19 @@ open -a TextEdit .env
 **Required values:**
 - `RAINDROP_TOKEN` - Get from https://app.raindrop.io/settings/integrations
 - `COLLECTION_ID` - Find in URL: https://app.raindrop.io/my/[THIS_NUMBER]
-- `SMTP_USER` - Your @icloud.com email
-- `SMTP_PASS` - App-specific password from https://appleid.apple.com/account/manage
+- `SMTP_USER` - Your email address (login for your SMTP provider)
+- `SMTP_PASS` - App-specific password for your email provider
 - `FROM_EMAIL` - Same as SMTP_USER
 - `TO_EMAIL` - Where to send the digest
 
 **Optional values:**
 - `ARCHIVE_ID` - Another collection for recommendation tags
-- `OPENAI_API_KEY` - For AI-powered recommendations
+- `NEWS_API_KEY` - Free key from https://newsapi.org/register (recommended for article recommendations)
+- `OPENAI_API_KEY` - AI fallback for recommendations if NEWS_API_KEY is not set
+- `PERPLEXITY_API_KEY` - AI fallback for recommendations if NEWS_API_KEY is not set
+- `AI_PROVIDER` - Which AI fallback to use: `openai` or `perplexity` (default: `openai`)
+- `SMTP_HOST` - SMTP server hostname (default: `smtp.mail.me.com` for iCloud)
+- `SMTP_PORT` - SMTP server port (default: `587`)
 
 ### 4. Test Locally
 
@@ -70,6 +78,18 @@ npm start
 # 🔍 Fetching items from ...
 # 📧 Sent
 ```
+
+## Email Provider Configuration
+
+By default, Pour Over uses iCloud Mail. To use Gmail, Outlook, or another provider, set `SMTP_HOST` and `SMTP_PORT` in your `.env`:
+
+| Provider | `SMTP_HOST` | `SMTP_PORT` | Notes |
+|----------|-------------|-------------|-------|
+| **iCloud** *(default)* | `smtp.mail.me.com` | `587` | Requires [app-specific password](https://appleid.apple.com/account/manage) |
+| **Gmail** | `smtp.gmail.com` | `587` | Requires [app password](https://myaccount.google.com/apppasswords) (2FA must be on) |
+| **Outlook / Hotmail** | `smtp-mail.outlook.com` | `587` | Use your full email as `SMTP_USER` |
+| **Yahoo Mail** | `smtp.mail.yahoo.com` | `587` | Requires [app password](https://login.yahoo.com/account/security) |
+| **Fastmail** | `smtp.fastmail.com` | `587` | Use your full email as `SMTP_USER` |
 
 ## Development Workflow
 
@@ -85,7 +105,7 @@ npm start
 If something fails locally:
 - Check `.env` file has all required values
 - Verify your Raindrop token is valid
-- Check your iCloud app-specific password
+- Check your app-specific password for your email provider
 - Look for error messages in the console
 
 ### Testing Email Without Sending
@@ -115,11 +135,16 @@ Then open `preview.html` in your browser to see what the email looks like.
    - `RAINDROP_TOKEN`
    - `COLLECTION_ID`
    - `ARCHIVE_ID` (optional)
+   - `NEWSAPI_KEY` (optional, recommended)
    - `OPENAI_API_KEY` (optional)
+   - `PERPLEXITY_API_KEY` (optional)
+   - `AI_PROVIDER` (optional)
    - `SMTP_USER`
    - `SMTP_PASS`
    - `FROM_EMAIL`
    - `TO_EMAIL`
+   - `SMTP_HOST` (optional, for non-iCloud providers)
+   - `SMTP_PORT` (optional, for non-iCloud providers)
 
 ### Testing GitHub Actions
 
@@ -131,15 +156,17 @@ After pushing your changes:
 
 ### Schedule
 
-The workflow runs automatically at:
+The workflow runs automatically every Sunday at:
 - **8:00 AM Pacific Time** (15:00 UTC)
 - **11:00 AM Eastern Time**
 
 To change the schedule, edit `.github/workflows/digest.yml`:
 ```yaml
 schedule:
-  - cron: '0 15 * * *'  # Change this line
+  - cron: '0 15 * * 0'  # Change this line (0 = Sunday)
 ```
+
+Use [crontab.guru](https://crontab.guru/) to build your own schedule.
 
 ## Troubleshooting
 
@@ -155,7 +182,13 @@ schedule:
 ### Email not sending
 - Check SMTP credentials in `.env`
 - Verify app-specific password (not your regular password)
+- If using a non-iCloud provider, confirm `SMTP_HOST` and `SMTP_PORT` are correct
 - Test with: `npm start` and check console output
+
+### Recommendations not showing
+- Ensure `ARCHIVE_ID` is set — recommendations are based on archive tags
+- Set `NEWS_API_KEY` (free from [newsapi.org](https://newsapi.org/register)) for best results
+- Or set `OPENAI_API_KEY` / `PERPLEXITY_API_KEY` as an AI fallback
 
 ### No items to send
 - Script requires >5 items in your Read Later collection
@@ -174,7 +207,7 @@ Now that you're set up:
 - [ ] Push changes to GitHub
 - [ ] Set up GitHub repository secrets
 - [ ] Test manual GitHub Actions run
-- [ ] Wait for scheduled run tomorrow!
+- [ ] Wait for the scheduled run!
 
 ## File Structure
 
@@ -193,4 +226,3 @@ pour-over-for-raindrop/
 ├── TODO.md                   # Task list
 └── SETUP.md                  # This file
 ```
-
