@@ -261,6 +261,14 @@ writeFileSync('preview.html', html);
 console.log('Preview saved to preview.html');
 ```
 
+## 💙 Supporting Friedreich's Ataxia Research
+
+Pour Over is free, and always will be. If it saves you time, consider passing it forward.
+
+Two people in my family live with [Friedreich's Ataxia](https://www.curefa.org/about-fa/understanding-fa/what-is-fa) — a progressive neurological condition with no known cure. The [Friedreich's Ataxia Research Alliance (FARA)](https://www.curefa.org/) funds the research working to change that.
+
+**[Donate to FARA →](https://www.curefa.org/donate)**
+
 ## 📝 License
 
 MIT License — see [LICENSE](./LICENSE) for details.
