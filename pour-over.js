@@ -436,7 +436,7 @@ function buildEmailHtml(items, recs = []) {
         return `<div class="rec-item">
           <a class="rec-link" href="${r.url}">${r.title}</a>
           <div class="meta">
-            ${domainHtml}<span>${domain ? '•' : ''}</span>${tagLink2}
+            ${domainHtml}${domain && tag2 ? '<span>•</span>' : ''}${tagLink2}
           </div>
           <hr/>
         </div>`;
